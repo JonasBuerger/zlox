@@ -1,0 +1,72 @@
+// For Loop Fibonacci
+print "
+For Loop Fibonacci";
+var start = clock();
+var a = 0;
+var index = 0;
+var temp;
+
+for (var b = 1; index < 18; b = temp + b) {
+  temp = a;{
+  a = b;}
+  index = index + 1;
+}
+ print a;
+
+print "Finished after ";
+print clock() - start;
+print "seconds";
+
+// User defined Function Call
+print "
+User defined Function Call";
+fun sayHi(first, last) {
+  print "Hi, " + first + " " + last + "!";
+}
+
+sayHi("Dear", "Reader");
+
+// Recursive Fibonacci
+print "
+Recursive Fibonacci";
+fun fib(n) {
+  if (n <= 1) return n;
+  return fib(n - 2) + fib(n - 1);
+}
+
+start = clock();
+print fib(18);
+print "Finished after ";
+print clock() - start;
+print "seconds";
+
+// Nested Function/Closure
+print "
+Nested Function/Closure";
+fun makeCounter() {
+  var i = 0;
+  fun count() {
+    i = i + 1;
+    print i;
+  }
+
+  return count;
+}
+
+var counter = makeCounter();
+counter(); // "1".
+counter(); // "2".
+
+// Preventing Dynamic Scope
+print "
+Preventing Dynamic Scope";
+var a = "global";
+{
+  fun showA() {
+    print a;
+  }
+
+  showA();
+  var a = "block";
+  showA();
+}

@@ -1,0 +1,84 @@
+// Your first Lox program!
+
+// Variables
+print("Variables");
+var hello = "Hello,";
+var world = " World!";
+
+print hello + world ;
+
+//Scope
+print("
+Scope");
+{
+    var world = " Earth!";
+    hello = "Bye,";
+
+    print hello + world ;
+}
+
+print hello + world ;
+
+
+// Precedence
+print("
+Precedence");
+print "1 - 2 * 3";
+var result = 1 - 2 * 3;
+print result;
+
+// Conditional Statements
+print("
+Conditional Statements");
+if("lala") {
+    print("lala");
+} else print("Unreachable");
+
+if (false) print("Unreachable");
+if (true) print("Reachable");
+
+// Logical Operators
+print("
+Logical Operators");
+print(2 or "Unreachable");
+print("Unreachable" and "hi");
+
+// Loops
+print("
+Loops");
+var counter = 5;
+while (counter > 0) {
+    print(counter);
+    counter = counter - 1;
+}
+
+for(var i = 5;i>0;i = i-1){
+    print(i);
+}
+
+// Fibonacci
+print("
+Fibonacci");
+var a = 0;
+var temp;
+
+for (var b = 1; a < 10000; b = temp + b) {
+  print a;
+  temp = a;
+  a = b;
+}
+
+// Break
+print("
+Break");
+
+var index = 0;
+
+for(;;){
+    index = index + 3;
+    if (index > 15) break;
+    index = index - 1;
+    print(index);
+}
+
+print(index);

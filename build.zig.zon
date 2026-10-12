@@ -1,0 +1,13 @@
+.{
+    .name = .zlox,
+    .version = "0.0.0",
+    .fingerprint = 0xd8b023c6738c4b3c, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "README.md",
+    },
+}
