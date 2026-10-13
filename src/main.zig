@@ -1,11 +1,13 @@
 const std = @import("std");
 const disassembleChunk = @import("debug.zig").disassembleChunk;
+const Chunk = @import("chunk.zig").ManagedChunk;
+const OpCode = @import("chunk.zig").OpCode;
+const Value = @import("chunk.zig").Value;
 
 comptime {
+    _ = @import("chunk.zig");
     _ = @import("debug.zig");
 }
-
-pub const OpCode = enum(u8) { OP_RETURN };
 
 pub fn main(init: std.process.Init) !void {
     const arena: std.mem.Allocator = init.arena.allocator();
@@ -14,10 +16,10 @@ pub fn main(init: std.process.Init) !void {
     // const args = try init.minimal.args.toSlice(arena);
 
     // initialize a stdout writer
-    const io = init.io;
-    var stdout_buffer: [1024]u8 = undefined;
-    var stdout_file_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
-    const stdout_writer = &stdout_file_writer.interface;
+    // const io = init.io;
+    // var stdout_buffer: [1024]u8 = undefined;
+    // var stdout_file_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
+    // const stdout_writer = &stdout_file_writer.interface;
 
     // Ensure a single arg with a filepath
     // if (args.len != 2) {
@@ -47,14 +49,28 @@ pub fn main(init: std.process.Init) !void {
     // try stdout_writer.print("{s}\nEOF\n", .{contents});
 
     // Create our bytecode data structure
-    var chunk: std.ArrayList(u8) = .empty;
-    defer chunk.deinit(arena);
-    try chunk.append(arena, @backingInt(OpCode.OP_RETURN));
+    var chunk = Chunk().init(arena);
+    defer chunk.deinit();
+
+    try chunk.addOpCode(OpCode.OP_RETURN);
+
+    try chunk.addOpCode(OpCode.OP_CONSTANT);
+    try chunk.addInstruction(try chunk.addConstant(Value{.number=1.6}));
+
+    try chunk.addOpCode(OpCode.OP_CONSTANT);
+    try chunk.addInstruction(try chunk.addConstant(Value{.number=42}));
+
+    try chunk.addOpCode(OpCode.OP_RETURN);
+    try chunk.addInstruction(42);
+    try chunk.addOpCode(OpCode.OP_RETURN);
+
+    try chunk.addOpCode(OpCode.OP_CONSTANT);
+    try chunk.addInstruction(try chunk.addConstant(Value{.number=9e10}));
 
     // Debug print to stdout
-    try stdout_writer.print("{any}\n\n", .{chunk});
-    try stdout_writer.flush(); // Don't forget to flush!
+    // try stdout_writer.print("{any}\n\n", .{chunk});
+    // try stdout_writer.flush(); // Don't forget to flush!
 
     // Use the bytecode debug statement
-    disassembleChunk(chunk.items, "test chunk");
+    disassembleChunk(chunk.code.items, "test chunk");
 }
