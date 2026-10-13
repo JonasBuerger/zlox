@@ -7,8 +7,12 @@ pub const OpCode = enum(u8) {
     OP_RETURN,
 };
 
-pub const Value = union {
-    number: f64
+pub const ValueType = enum {
+    number,
+};
+
+pub const Value = union(ValueType) {
+    number: f64,
 };
 
 pub fn ManagedChunk() type {

@@ -55,22 +55,31 @@ pub fn main(init: std.process.Init) !void {
     try chunk.addOpCode(OpCode.OP_RETURN);
 
     try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{.number=1.6}));
+    try chunk.addInstruction(try chunk.addConstant(Value{ .number = 1.6 }));
 
     try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{.number=42}));
+    try chunk.addInstruction(try chunk.addConstant(Value{ .number = 42 }));
 
     try chunk.addOpCode(OpCode.OP_RETURN);
     try chunk.addInstruction(42);
     try chunk.addOpCode(OpCode.OP_RETURN);
 
     try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{.number=9e10}));
+    try chunk.addInstruction(try chunk.addConstant(Value{ .number = 9e10 }));
+
+    try chunk.addOpCode(OpCode.OP_CONSTANT);
+    try chunk.addInstruction(try chunk.addConstant(Value{ .number = 1e-15 + 1 }));
+
+    try chunk.addOpCode(OpCode.OP_CONSTANT);
+    try chunk.addInstruction(try chunk.addConstant(Value{ .number = -1e10 }));
+
+    try chunk.addOpCode(OpCode.OP_CONSTANT);
+    try chunk.addInstruction(try chunk.addConstant(Value{ .number = -15 }));
 
     // Debug print to stdout
     // try stdout_writer.print("{any}\n\n", .{chunk});
     // try stdout_writer.flush(); // Don't forget to flush!
 
     // Use the bytecode debug statement
-    disassembleChunk(chunk.code.items, "test chunk");
+    disassembleChunk(chunk, "test chunk");
 }
