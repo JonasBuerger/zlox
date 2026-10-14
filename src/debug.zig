@@ -39,10 +39,10 @@ fn disassembleInstruction(chunk: Chunk, offset: usize, writer: *std.Io.Writer) !
     try printVerticalConnector(writer);
     try writer.print("{d:0>4}", .{offset});
     try printVerticalConnector(writer);
-    if (offset > 0 and chunk.lines.items[offset] == chunk.lines.items[offset - 1]) {
+    if (offset > 0 and chunk.getLine(offset) == chunk.getLine(offset - 1)) {
         try writer.print("    ", .{});
     } else {
-        try writer.print("{d:0>4}", .{chunk.lines.items[offset]});
+        try writer.print("{d:0>4}", .{chunk.getLine(offset)});
     }
     try printVerticalConnector(writer);
 

@@ -43,7 +43,25 @@ pub fn ManagedChunk() type {
         /// Schreibt ungeprüft direkt in das bytecode array
         pub fn write(self: *Self, instruction: u8, line: usize) !void {
             try self.code.append(self.allocator, instruction);
-            try self.lines.append(self.allocator, line);
+
+            if (self.lines.items.len == 0 or self.lines.last() != line) {
+                try self.lines.append(self.allocator, 1);
+                try self.lines.append(self.allocator, line);
+            } else {
+                self.lines.items[self.lines.items.len - 2] += 1;
+            }
+        }
+
+        pub fn getLine(self: Self, offset: usize) usize {
+            var position:usize = 0;
+            var index:usize = 0;
+            while (index < (self.lines.items.len - 1)) : (index += 2) {
+                position += self.lines.items[index];
+                if (position > offset) {
+                    return self.lines.items[index + 1];
+                }
+            }
+            return 0;
         }
 
         pub fn addOpCode(self: *Self, opCode: OpCode, line: usize) !void {
