@@ -2,26 +2,20 @@ const std = @import("std");
 const print = std.debug.print;
 const OpCode = @import("chunk.zig").OpCode;
 const Value = @import("chunk.zig").Value;
-const Chunk = @import("chunk.zig").ManagedChunk();
+const Chunk = @import("chunk.zig").ManagedChunk;
 
-// https://en.wikipedia.org/wiki/Box-drawing_characters
-const CrossConnector = 0x253C;
-const BranchRightConnector = 0x251C;
-const BranchLeftConnector = 0x2524;
-const LeafConnector = 0x2514;
-const HorizontalConnector = 0x2500;
-const VerticalConnector = 0x2502;
-const DoubleHorizontalConnector = 0x2550;
-const TableHeader = "\u{2502}IDX \u{2502}LINE\u{2502}OP_CODE            \u{2502}OPERAND 1\u{2502}OPERAND 2\u{2502}EXTRA                       \u{2502}\n";
-const TableHeaderSeparator = "\u{251C}\u{2500}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{253C}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2524}\n";
+const TableHeaderTop = "┌────┬────┬───────────────────┬─────────┬─────────┬────────────────────────────┐\n";
+const TableHeader = "│IDX │LINE│OP_CODE            │OPERAND 1│OPERAND 2│EXTRA                       │\n";
+const TableHeaderSeparator = "├────┼────┼───────────────────┼─────────┼─────────┼────────────────────────────┤\n";
+const TableFooter = "└────┴────┴───────────────────┴─────────┴─────────┴────────────────────────────┘\n";
 
 pub fn disassembleChunk(chunk: Chunk, name: []const u8, io: std.Io) !void {
     // initialize a stderr writer
     var writer_buffer: [1024]u8 = undefined;
     var file_writer: std.Io.File.Writer = .init(.stderr(), io, &writer_buffer);
     const writer = &file_writer.interface;
-
-    try writer.print("{s:=^80}\n", .{name});
+    try writer.print("{s: ^80}\n", .{name});
+    try writer.print(TableHeaderTop, .{});
     try writer.print(TableHeader, .{});
     try writer.print(TableHeaderSeparator, .{});
     var offset: usize = 0;
@@ -32,19 +26,17 @@ pub fn disassembleChunk(chunk: Chunk, name: []const u8, io: std.Io) !void {
             try writer.flush();
         }
     }
+    try writer.print(TableFooter, .{});
     try writer.flush();
 }
 
 fn disassembleInstruction(chunk: Chunk, offset: usize, writer: *std.Io.Writer) !usize {
-    try printVerticalConnector(writer);
-    try writer.print("{d:0>4}", .{offset});
-    try printVerticalConnector(writer);
+    try writer.print("│{d:0>4}│", .{offset});
     if (offset > 0 and chunk.getLine(offset) == chunk.getLine(offset - 1)) {
-        try writer.print("    ", .{});
+        try writer.print("    │", .{});
     } else {
-        try writer.print("{d:0>4}", .{chunk.getLine(offset)});
+        try writer.print("{d:0>4}│", .{chunk.getLine(offset)});
     }
-    try printVerticalConnector(writer);
 
     const instruction = chunk.code.items[offset];
     return switch (instruction) {
@@ -76,8 +68,7 @@ fn disassembleInstruction(chunk: Chunk, offset: usize, writer: *std.Io.Writer) !
             return offset + 4;
         },
         else => {
-            try writer.print("Unknown opcode [{x:0>2}]", .{instruction});
-            try printVerticalConnector(writer);
+            try writer.print("Unknown opcode [{x:0>2}]│", .{instruction});
             try printEmptyOperandField(writer);
             try printEmptyOperandField(writer);
             try printEmptyExtraField(writer);
@@ -87,48 +78,38 @@ fn disassembleInstruction(chunk: Chunk, offset: usize, writer: *std.Io.Writer) !
     };
 }
 
-fn printVerticalConnector(writer: *std.Io.Writer) !void {
-    try writer.print("{u}", .{VerticalConnector});
-}
-
 fn printNewline(writer: *std.Io.Writer) !void {
     try writer.print("\n", .{});
 }
 
 fn printOpCode(opCode: OpCode, writer: *std.Io.Writer) !void {
-    try writer.print("{s: <19}", .{@tagName(opCode)});
-    try printVerticalConnector(writer);
+    try writer.print("{s: <19}│", .{@tagName(opCode)});
 }
 
 fn printOperandCode(operand: u8, writer: *std.Io.Writer) !void {
-    try writer.print("{x:0>2}       ", .{operand});
-    try printVerticalConnector(writer);
+    try writer.print("{x:0>2}       │", .{operand});
 }
 
 fn printLongOperandCode(operand: u24, writer: *std.Io.Writer) !void {
-    try writer.print("{x:0>6}   ", .{operand});
-    try printVerticalConnector(writer);
+    try writer.print("{x:0>6}   │", .{operand});
 }
 
 fn printValue(value: Value, writer: *std.Io.Writer) !void {
     switch (value) {
         .number => |v| {
             if (v > 1e-9 and v < 1e9 or v < -1e-9 and v > -1e9) {
-                try writer.print("{d: <28}", .{v});
+                try writer.print("{d: <28}│", .{v});
             } else {
-                try writer.print("{e: <28}", .{v});
+                try writer.print("{e: <28}│", .{v});
             }
         },
     }
-    try printVerticalConnector(writer);
 }
 
 fn printEmptyOperandField(writer: *std.Io.Writer) !void {
-    try writer.print("         ", .{});
-    try printVerticalConnector(writer);
+    try writer.print("         │", .{});
 }
 
 fn printEmptyExtraField(writer: *std.Io.Writer) !void {
-    try writer.print("                            ", .{});
-    try printVerticalConnector(writer);
+    try writer.print("                            │", .{});
 }

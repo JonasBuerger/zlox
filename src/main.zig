@@ -3,10 +3,13 @@ const disassembleChunk = @import("debug.zig").disassembleChunk;
 const Chunk = @import("chunk.zig").ManagedChunk;
 const OpCode = @import("chunk.zig").OpCode;
 const Value = @import("chunk.zig").Value;
+const VirtualMachine = @import("vm.zig").VirtualMachine;
 
 comptime {
     _ = @import("chunk.zig");
     _ = @import("debug.zig");
+    _ = @import("box_chars.zig");
+    _ = @import("vm.zig");
 }
 
 pub fn main(init: std.process.Init) !void {
@@ -16,10 +19,9 @@ pub fn main(init: std.process.Init) !void {
     // const args = try init.minimal.args.toSlice(arena);
 
     // initialize a stdout writer
-    // const io = init.io;
-    // var stdout_buffer: [1024]u8 = undefined;
-    // var stdout_file_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
-    // const stdout_writer = &stdout_file_writer.interface;
+    // var stderr_buffer: [1024]u8 = undefined;
+    // var file_writer: std.Io.File.Writer = .init(.stderr(), init.io, &stderr_buffer);
+    // const writer = &file_writer.interface;
 
     // Ensure a single arg with a filepath
     // if (args.len != 2) {
@@ -49,7 +51,7 @@ pub fn main(init: std.process.Init) !void {
     // try stdout_writer.print("{s}\nEOF\n", .{contents});
 
     // Create our bytecode data structure
-    var chunk = Chunk().init(arena);
+    var chunk = Chunk.init(arena);
     defer chunk.deinit();
     var line: usize = 1;
 
@@ -81,4 +83,9 @@ pub fn main(init: std.process.Init) !void {
 
     // Use the bytecode debug statement
     try disassembleChunk(chunk, "example chunk", init.io);
+    try disassembleChunk(Chunk.init(arena), "empty chunk", init.io);
+
+    var vm = VirtualMachine.init(arena, init.io);
+
+    try vm.interpret(&chunk);
 }
