@@ -1,5 +1,5 @@
 const std = @import("std");
-const disassembleChunkBuffered = @import("debug.zig").disassembleChunkBuffered;
+const disassembleChunk = @import("debug.zig").disassembleChunk;
 const Chunk = @import("chunk.zig").ManagedChunk;
 const OpCode = @import("chunk.zig").OpCode;
 const Value = @import("chunk.zig").Value;
@@ -69,12 +69,16 @@ pub fn main(init: std.process.Init) !void {
     try chunk.addConstant(Value{ .number = 1e-15 + 1 }, line);
     line += 1;
     try chunk.addConstant(Value{ .number = -1e10 }, line);
-    try chunk.addConstant(Value{ .number = -15 }, line);
+
+    // Cause OP_CONSTANT_LONG OpCode to be emitted
+    // for (50..500) |idx| {
+    //     try chunk.addConstant(Value{ .number = @floatFromInt(idx) }, line);
+    // }
 
     // Debug print to stdout
     // try stdout_writer.print("{any}\n\n", .{chunk});
     // try stdout_writer.flush(); // Don't forget to flush!
 
     // Use the bytecode debug statement
-    try disassembleChunkBuffered(chunk, "example chunk", init.io);
+    try disassembleChunk(chunk, "example chunk", init.io);
 }

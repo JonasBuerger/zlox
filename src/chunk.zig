@@ -3,6 +3,7 @@ const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 
 pub const OpCode = enum(u8) {
+    OP_CONSTANT_LONG,
     OP_CONSTANT,
     OP_RETURN,
 };
@@ -39,7 +40,7 @@ pub fn ManagedChunk() type {
             self.lines.deinit(self.allocator);
         }
 
-        /// Schreibt direkt in das bytecode array, ohne prüfung, ob die
+        /// Schreibt ungeprüft direkt in das bytecode array
         pub fn write(self: *Self, instruction: u8, line: usize) !void {
             try self.code.append(self.allocator, instruction);
             try self.lines.append(self.allocator, line);
@@ -50,9 +51,18 @@ pub fn ManagedChunk() type {
         }
 
         pub fn addConstant(self: *Self, constant: Value, line: usize) !void {
-            try self.addOpCode(OpCode.OP_CONSTANT, line);
-            try self.constants.append(self.allocator, constant);
-            try self.write(@intCast(self.constants.items.len - 1), line);
+            if (self.constants.items.len < 256) {
+                try self.addOpCode(OpCode.OP_CONSTANT, line);
+                try self.constants.append(self.allocator, constant);
+                try self.write(@intCast(self.constants.items.len - 1), line);
+            } else {
+                try self.addOpCode(OpCode.OP_CONSTANT_LONG, line);
+                try self.constants.append(self.allocator, constant);
+                const index: [3]u8 = @bitCast(@as(u24, @intCast(self.constants.items.len - 1)));
+                try self.write(index[0], line);
+                try self.write(index[1], line);
+                try self.write(index[2], line);
+            }
         }
     };
 }
