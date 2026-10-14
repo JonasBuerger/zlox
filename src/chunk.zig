@@ -19,6 +19,7 @@ pub fn ManagedChunk() type {
     return struct {
         code: ArrayList(u8),
         constants: ArrayList(Value),
+        lines: ArrayList(usize),
         allocator: Allocator,
 
         const Self = @This();
@@ -27,6 +28,7 @@ pub fn ManagedChunk() type {
             return .{
                 .code = .empty,
                 .constants = .empty,
+                .lines = .empty,
                 .allocator = allocator,
             };
         }
@@ -34,19 +36,23 @@ pub fn ManagedChunk() type {
         pub fn deinit(self: *Self) void {
             self.code.deinit(self.allocator);
             self.constants.deinit(self.allocator);
+            self.lines.deinit(self.allocator);
         }
 
-        pub fn addOpCode(self: *Self, opCode: OpCode) !void {
-            try self.addInstruction(@backingInt(opCode));
-        }
-
-        pub fn addInstruction(self: *Self, instruction: u8) !void {
+        /// Schreibt direkt in das bytecode array, ohne prüfung, ob die
+        pub fn write(self: *Self, instruction: u8, line: usize) !void {
             try self.code.append(self.allocator, instruction);
+            try self.lines.append(self.allocator, line);
         }
 
-        pub fn addConstant(self: *Self, constant: Value) !u8 {
+        pub fn addOpCode(self: *Self, opCode: OpCode, line: usize) !void {
+            try self.write(@backingInt(opCode), line);
+        }
+
+        pub fn addConstant(self: *Self, constant: Value, line: usize) !void {
+            try self.addOpCode(OpCode.OP_CONSTANT, line);
             try self.constants.append(self.allocator, constant);
-            return @intCast(self.constants.items.len - 1);
+            try self.write(@intCast(self.constants.items.len - 1), line);
         }
     };
 }

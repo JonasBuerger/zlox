@@ -1,5 +1,5 @@
 const std = @import("std");
-const disassembleChunk = @import("debug.zig").disassembleChunk;
+const disassembleChunkBuffered = @import("debug.zig").disassembleChunkBuffered;
 const Chunk = @import("chunk.zig").ManagedChunk;
 const OpCode = @import("chunk.zig").OpCode;
 const Value = @import("chunk.zig").Value;
@@ -42,7 +42,7 @@ pub fn main(init: std.process.Init) !void {
     //     error.FileNotFound => {
     //         try stdout_writer.print("Error: file not found: {s}\n", .{args[1]});
     //         try stdout_writer.flush();
-    //         std.process.exit(1);
+    //         std.process.exit(line);
     //     },
     //     else => return err,
     // };
@@ -51,35 +51,30 @@ pub fn main(init: std.process.Init) !void {
     // Create our bytecode data structure
     var chunk = Chunk().init(arena);
     defer chunk.deinit();
+    var line: usize = 1;
 
-    try chunk.addOpCode(OpCode.OP_RETURN);
-
-    try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{ .number = 1.6 }));
-
-    try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{ .number = 42 }));
-
-    try chunk.addOpCode(OpCode.OP_RETURN);
-    try chunk.addInstruction(42);
-    try chunk.addOpCode(OpCode.OP_RETURN);
-
-    try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{ .number = 9e10 }));
-
-    try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{ .number = 1e-15 + 1 }));
-
-    try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{ .number = -1e10 }));
-
-    try chunk.addOpCode(OpCode.OP_CONSTANT);
-    try chunk.addInstruction(try chunk.addConstant(Value{ .number = -15 }));
+    // Assemble bytecode example chunk by hand
+    try chunk.addOpCode(OpCode.OP_RETURN, line);
+    line += 1;
+    try chunk.addConstant(Value{ .number = 1.6 }, line);
+    try chunk.addConstant(Value{ .number = 42 }, line);
+    line += 1;
+    try chunk.addOpCode(OpCode.OP_RETURN, line);
+    try chunk.write(42, line);
+    line += 1;
+    try chunk.addOpCode(OpCode.OP_RETURN, line);
+    line += 1;
+    try chunk.addConstant(Value{ .number = 9e10 }, line);
+    line += 1;
+    try chunk.addConstant(Value{ .number = 1e-15 + 1 }, line);
+    line += 1;
+    try chunk.addConstant(Value{ .number = -1e10 }, line);
+    try chunk.addConstant(Value{ .number = -15 }, line);
 
     // Debug print to stdout
     // try stdout_writer.print("{any}\n\n", .{chunk});
     // try stdout_writer.flush(); // Don't forget to flush!
 
     // Use the bytecode debug statement
-    disassembleChunk(chunk, "test chunk");
+    try disassembleChunkBuffered(chunk, "example chunk", init.io);
 }
