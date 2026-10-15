@@ -38,7 +38,13 @@ pub fn disassembleInstruction(chunk: *Chunk, offset: usize, writer: *std.Io.Writ
 
     const instruction = chunk.code.items[offset];
     return switch (instruction) {
-        @backingInt(OpCode.OP_RETURN) => {
+        @backingInt(OpCode.OP_RETURN),
+        @backingInt(OpCode.OP_NEGATE),
+        @backingInt(OpCode.OP_ADD),
+        @backingInt(OpCode.OP_SUBTRACT),
+        @backingInt(OpCode.OP_MULTIPLY),
+        @backingInt(OpCode.OP_DIVIDE),
+        => {
             try printOpCode(@fromBackingInt(instruction), writer);
             try printEmptyOperandField(writer);
             try printEmptyOperandField(writer);
@@ -110,6 +116,9 @@ fn printValue(value: Value, writer: *std.Io.Writer) !void {
             } else {
                 try writer.print("{e: <28}│", .{v});
             }
+        },
+        .nil => {
+            try writer.print("{s: <28}│", .{"nil"});
         },
     }
 }

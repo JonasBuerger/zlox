@@ -13,11 +13,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    const options  = b.addOptions();
-    options.addOption(
-        bool,
-        "trace_execution",
-        b.option(bool, "trace_execution", "print executed bytecode instructions") orelse false);
+    const options = b.addOptions();
+    options.addOption(bool, "trace_execution", b.option(bool, "trace_execution", "print executed bytecode instructions") orelse false);
+    options.addOption(bool, "stack_trace", b.option(bool, "stack_trace", "print stack before every bytecode instructions, requires 'trace_execution'") orelse false);
     exe.root_module.addOptions("build_options", options);
 
     b.installArtifact(exe);

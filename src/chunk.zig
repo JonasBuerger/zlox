@@ -5,15 +5,22 @@ const Allocator = std.mem.Allocator;
 pub const OpCode = enum(u8) {
     OP_CONSTANT_LONG,
     OP_CONSTANT,
+    OP_ADD,
+    OP_SUBTRACT,
+    OP_MULTIPLY,
+    OP_DIVIDE,
+    OP_NEGATE,
     OP_RETURN,
 };
 
 pub const ValueType = enum {
     number,
+    nil,
 };
 
 pub const Value = union(ValueType) {
     number: f64,
+    nil: void,
 };
 
 pub const ManagedChunk = struct {
@@ -68,7 +75,7 @@ pub const ManagedChunk = struct {
     }
 
     pub fn addConstant(self: *Self, constant: Value, line: usize) !void {
-        if (self.constants.items.len < 256) {
+        if (self.constants.items.len <= std.math.maxInt(u8)) {
             try self.addOpCode(OpCode.OP_CONSTANT, line);
             try self.constants.append(self.allocator, constant);
             try self.write(@intCast(self.constants.items.len - 1), line);

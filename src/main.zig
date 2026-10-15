@@ -55,8 +55,10 @@ pub fn main(init: std.process.Init) !void {
     defer chunk.deinit();
     var line: usize = 1;
 
-    try chunk.addConstant(Value{ .number = -1e-15 }, line);
-
+    // Assemble bytecode example chunk by hand
+    try chunk.addConstant(Value{ .number = 1.2 }, line);
+    try chunk.addConstant(Value{ .number = 5 }, line);
+    try chunk.addOpCode(.OP_SUBTRACT, line);
     line += 1;
 
     // Cause OP_CONSTANT_LONG OpCode to be emitted
@@ -64,13 +66,21 @@ pub fn main(init: std.process.Init) !void {
     //     try chunk.addConstant(Value{ .number = @floatFromInt(idx) }, line);
     // }
 
-    // Assemble bytecode example chunk by hand
-    try chunk.addOpCode(OpCode.OP_RETURN, line);
+    try chunk.addConstant(Value{ .number = -3 }, line);
+    try chunk.addOpCode(.OP_NEGATE, line);
+    try chunk.addOpCode(.OP_SUBTRACT, line);
+    try chunk.addOpCode(.OP_NEGATE, line);
+    try chunk.addConstant(Value{ .number = 5 }, line);
+    try chunk.addOpCode(.OP_MULTIPLY, line);
+    try chunk.addConstant(Value{ .number = 1e-15 }, line);
+    try chunk.addOpCode(.OP_ADD, line);
+    try chunk.addOpCode(.OP_RETURN, line);
 
     // Use the bytecode debug statement
-    try disassembleChunk(&chunk, "example chunk", init.io);
+    // try disassembleChunk(&chunk, "example chunk", init.io);
 
     var vm = VirtualMachine.init(arena, init.io);
+    defer vm.deinit();
 
     try vm.interpret(&chunk);
 }
