@@ -9,15 +9,13 @@ const TableHeader = "│IDX │LINE│OP_CODE            │OPERAND 1│OPERAND 
 const TableHeaderSeparator = "├────┼────┼───────────────────┼─────────┼─────────┼────────────────────────────┤\n";
 const TableFooter = "└────┴────┴───────────────────┴─────────┴─────────┴────────────────────────────┘\n";
 
-pub fn disassembleChunk(chunk: Chunk, name: []const u8, io: std.Io) !void {
+pub fn disassembleChunk(chunk: *Chunk, name: []const u8, io: std.Io) !void {
     // initialize a stderr writer
     var writer_buffer: [1024]u8 = undefined;
     var file_writer: std.Io.File.Writer = .init(.stderr(), io, &writer_buffer);
     const writer = &file_writer.interface;
     try writer.print("{s: ^80}\n", .{name});
-    try writer.print(TableHeaderTop, .{});
-    try writer.print(TableHeader, .{});
-    try writer.print(TableHeaderSeparator, .{});
+    try printTableHead(writer);
     var offset: usize = 0;
 
     while (offset < chunk.code.items.len) {
@@ -26,11 +24,11 @@ pub fn disassembleChunk(chunk: Chunk, name: []const u8, io: std.Io) !void {
             try writer.flush();
         }
     }
-    try writer.print(TableFooter, .{});
+    try printTableFoot(writer);
     try writer.flush();
 }
 
-fn disassembleInstruction(chunk: Chunk, offset: usize, writer: *std.Io.Writer) !usize {
+pub fn disassembleInstruction(chunk: *Chunk, offset: usize, writer: *std.Io.Writer) !usize {
     try writer.print("│{d:0>4}│", .{offset});
     if (offset > 0 and chunk.getLine(offset) == chunk.getLine(offset - 1)) {
         try writer.print("    │", .{});
@@ -76,6 +74,16 @@ fn disassembleInstruction(chunk: Chunk, offset: usize, writer: *std.Io.Writer) !
             return offset + 1;
         },
     };
+}
+
+pub fn printTableHead(writer: *std.Io.Writer) !void {
+    try writer.print(TableHeaderTop, .{});
+    try writer.print(TableHeader, .{});
+    try writer.print(TableHeaderSeparator, .{});
+}
+
+pub fn printTableFoot(writer: *std.Io.Writer) !void {
+    try writer.print(TableFooter, .{});
 }
 
 fn printNewline(writer: *std.Io.Writer) !void {

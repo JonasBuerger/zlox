@@ -13,6 +13,13 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    const options  = b.addOptions();
+    options.addOption(
+        bool,
+        "trace_execution",
+        b.option(bool, "trace_execution", "print executed bytecode instructions") orelse false);
+    exe.root_module.addOptions("build_options", options);
+
     b.installArtifact(exe);
     const run_step = b.step("run", "Run the app");
     const run_cmd = b.addRunArtifact(exe);

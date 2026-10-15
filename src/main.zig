@@ -55,35 +55,20 @@ pub fn main(init: std.process.Init) !void {
     defer chunk.deinit();
     var line: usize = 1;
 
-    // Assemble bytecode example chunk by hand
-    try chunk.addOpCode(OpCode.OP_RETURN, line);
+    try chunk.addConstant(Value{ .number = -1e-15 }, line);
+
     line += 1;
-    try chunk.addConstant(Value{ .number = 1.6 }, line);
-    try chunk.addConstant(Value{ .number = 42 }, line);
-    line += 1;
-    try chunk.addOpCode(OpCode.OP_RETURN, line);
-    try chunk.write(42, line);
-    line += 1;
-    try chunk.addOpCode(OpCode.OP_RETURN, line);
-    line += 1;
-    try chunk.addConstant(Value{ .number = 9e10 }, line);
-    line += 1;
-    try chunk.addConstant(Value{ .number = 1e-15 + 1 }, line);
-    line += 1;
-    try chunk.addConstant(Value{ .number = -1e10 }, line);
 
     // Cause OP_CONSTANT_LONG OpCode to be emitted
     // for (50..500) |idx| {
     //     try chunk.addConstant(Value{ .number = @floatFromInt(idx) }, line);
     // }
 
-    // Debug print to stdout
-    // try stdout_writer.print("{any}\n\n", .{chunk});
-    // try stdout_writer.flush(); // Don't forget to flush!
+    // Assemble bytecode example chunk by hand
+    try chunk.addOpCode(OpCode.OP_RETURN, line);
 
     // Use the bytecode debug statement
-    try disassembleChunk(chunk, "example chunk", init.io);
-    try disassembleChunk(Chunk.init(arena), "empty chunk", init.io);
+    try disassembleChunk(&chunk, "example chunk", init.io);
 
     var vm = VirtualMachine.init(arena, init.io);
 
