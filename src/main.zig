@@ -12,79 +12,70 @@ comptime {
     _ = @import("vm.zig");
 }
 
-pub fn main(init: std.process.Init) !void {
+pub fn main(init: std.process.Init) !u8 {
     const arena: std.mem.Allocator = init.arena.allocator();
 
     // read in all args
-    // const args = try init.minimal.args.toSlice(arena);
+    const args = try init.minimal.args.toSlice(arena);
 
-    // initialize a stdout writer
-    // var stderr_buffer: [1024]u8 = undefined;
-    // var file_writer: std.Io.File.Writer = .init(.stderr(), init.io, &stderr_buffer);
-    // const writer = &file_writer.interface;
-
-    // Ensure a single arg with a filepath
-    // if (args.len != 2) {
-    //     try stdout_writer.print("Usage {s} <lox file>\n", .{args[0]});
-    //     try stdout_writer.flush();
-    //     std.process.exit(2);
-    // }
-    // const path = try std.Io.Dir.realPathFileAlloc(std.Io.Dir.cwd(), io, args[1], arena);
-    // try stdout_writer.print("File: {s}\n\n", .{path});
-
-    // Read the file contents all at once
-    //
-    // const contents = std.Io.Dir.readFileAlloc(
-    //     std.Io.Dir.cwd(),
-    //     io,
-    //     args[1],
-    //     arena,
-    //     .unlimited,
-    // ) catch |err| switch (err) {
-    //     error.FileNotFound => {
-    //         try stdout_writer.print("Error: file not found: {s}\n", .{args[1]});
-    //         try stdout_writer.flush();
-    //         std.process.exit(line);
-    //     },
-    //     else => return err,
-    // };
-    // try stdout_writer.print("{s}\nEOF\n", .{contents});
-
-    // Create our bytecode data structure
-    var chunk = Chunk.init(arena);
-    defer chunk.deinit();
-    var line: usize = 1;
-
-    // Assemble bytecode example chunk by hand
-    try chunk.addConstant(Value{ .number = 1.2 }, line);
-    try chunk.addConstant(Value{ .number = 5 }, line);
-    try chunk.addOpCode(.OP_SUBTRACT, line);
-    line += 1;
-
-    // Cause OP_CONSTANT_LONG OpCode to be emitted
-    // for (50..500) |idx| {
-    //     try chunk.addConstant(Value{ .number = @floatFromInt(idx) }, line);
-    // }
-     for (0..10_000) |_| {
-         try chunk.addConstant(Value{ .number = 1}, line);
-         try chunk.addOpCode(.OP_ADD, line);
-     }
-
-    try chunk.addConstant(Value{ .number = -3 }, line);
-    try chunk.addOpCode(.OP_NEGATE, line);
-    try chunk.addOpCode(.OP_SUBTRACT, line);
-    try chunk.addOpCode(.OP_NEGATE, line);
-    try chunk.addConstant(Value{ .number = 5 }, line);
-    try chunk.addOpCode(.OP_MULTIPLY, line);
-    try chunk.addConstant(Value{ .number = 1e-15 }, line);
-    try chunk.addOpCode(.OP_ADD, line);
-    try chunk.addOpCode(.OP_RETURN, line);
-
-    // Use the bytecode debug statement
-    // try disassembleChunk(&chunk, "example chunk", init.io);
-
-    var vm = VirtualMachine.init(arena, init.io);
+    var vm: VirtualMachine = .init(init.io, arena);
     defer vm.deinit();
 
+    // Ensure a single arg with a filepath
+    if (args.len == 1) {
+        try repl(&vm, init.io, arena);
+    } else if (args.len == 2) {
+        const path = try std.Io.Dir.realPathFileAlloc(std.Io.Dir.cwd(), init.io, args[1], arena);
+        try runFile(path, &vm, init.io, arena);
+    } else {
+        // initialize a stdout writer
+        var stdout_buffer: [1024]u8 = undefined;
+        var stdout_writer: std.Io.File.Writer = .init(.stdout(), init.io, &stdout_buffer);
+        const writer = &stdout_writer.interface;
+
+        // Print usage information
+        try writer.print("Usage: {s} [path]\n", .{args[0]});
+        try writer.flush();
+        return 64;
+    }
+
+    return 0;
+}
+
+fn repl(vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
+    var read_buffer: [4_096]u8 = undefined;
+    var write_buffer: [4_096]u8 = undefined;
+    var stdin_reader = std.Io.File.stdin().reader(io, &read_buffer);
+    var stdout_writer: std.Io.File.Writer = .init(.stdout(), io, &write_buffer);
+    const reader = &stdin_reader.interface;
+    const writer = &stdout_writer.interface;
+    while (true) {
+        try writer.print("> ", .{});
+        try writer.flush();
+        const input = try std.Io.Reader.takeDelimiter(reader, '\n') orelse return;
+        if (input.len == 0) return;
+        try interpret(input, vm, io, allocator);
+    }
+}
+
+fn runFile(path: []u8, vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
+    // Read the file contents all at once
+    const source = try std.Io.Dir.readFileAlloc(
+        std.Io.Dir.cwd(),
+        io,
+        path,
+        allocator,
+        .unlimited,
+    );
+    try interpret(source, vm, io, allocator);
+}
+
+fn interpret(source: []u8, vm: *VirtualMachine, _: std.Io, allocator: std.mem.Allocator) !void {
+    var chunk = try compile(source, allocator);
     try vm.interpret(&chunk);
+}
+fn compile(_: []u8, allocator: std.mem.Allocator) !Chunk {
+    var chunk = Chunk.init(allocator);
+    try chunk.addConstant(.nil, 1);
+    return chunk;
 }

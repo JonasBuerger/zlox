@@ -25,7 +25,7 @@ pub const VirtualMachine = struct {
 
     const Self = @This();
 
-    pub fn init(allocator: Allocator, io: std.Io) Self {
+    pub fn init(io: std.Io, allocator: Allocator) Self {
         return .{
             .chunk = null,
             .ip = null,
