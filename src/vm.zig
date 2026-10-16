@@ -55,60 +55,59 @@ pub const VirtualMachine = struct {
         const starttime = std.Io.Clock.now(.cpu_thread, self.io);
 
         if (comptime opt.trace_execution) {
-            debug.printTableHead(writer) catch return error.WRITER_ERROR;
+            debug.printTableHead(writer) catch return InterpretError.WRITER_ERROR;
         }
 
         while (true) {
             if (comptime opt.trace_stack) {
-                writer.print("│", .{}) catch return error.WRITER_ERROR;
+                writer.print("│", .{}) catch return InterpretError.WRITER_ERROR;
                 for (self.stack.items) |stackValue| {
                     try printValue(writer, stackValue);
 
-                    writer.print("│", .{}) catch return error.WRITER_ERROR;
+                    writer.print("│", .{}) catch return InterpretError.WRITER_ERROR;
                 }
-                writer.print("\n", .{}) catch return error.WRITER_ERROR;
+                writer.print("\n", .{}) catch return InterpretError.WRITER_ERROR;
             }
             if (comptime opt.trace_execution) {
-                _ = debug.disassembleInstruction(self.chunk.?, self.ip.? - self.chunk.?.code.items.ptr, writer) catch return error.WRITER_ERROR;
+                _ = debug.disassembleInstruction(self.chunk.?, self.ip.? - self.chunk.?.code.items.ptr, writer) catch return InterpretError.WRITER_ERROR;
             }
             switch (self.readByte()) {
                 @backingInt(OpCode.OP_CONSTANT) => try self.pushStack(self.readConstant()),
                 @backingInt(OpCode.OP_CONSTANT_LONG) => try self.pushStack(self.readConstantLong()),
-                @backingInt(OpCode.OP_NEGATE) => try self.pushStack(Value{ .number = -try self.popStackNumber() }),
+                @backingInt(OpCode.OP_NEGATE) => self.stack.lastPtr().?.*.number = -self.stack.last().?.number,
                 @backingInt(OpCode.OP_ADD),
                 @backingInt(OpCode.OP_SUBTRACT),
                 @backingInt(OpCode.OP_MULTIPLY),
                 @backingInt(OpCode.OP_DIVIDE),
                 => |opCode| {
-                    const a = try self.popStackNumber();
-                    const b = try self.popStackNumber();
-                    try switch (opCode) {
-                        @backingInt(OpCode.OP_ADD) => self.pushStack(Value{ .number = a + b }),
-                        @backingInt(OpCode.OP_SUBTRACT) => self.pushStack(Value{ .number = a - b }),
-                        @backingInt(OpCode.OP_MULTIPLY) => self.pushStack(Value{ .number = a * b }),
-                        @backingInt(OpCode.OP_DIVIDE) => self.pushStack(Value{ .number = a / b }),
+                    const operand = (try self.popStack()).number;
+                    switch (opCode) {
+                        @backingInt(OpCode.OP_ADD) => self.stack.lastPtr().?.*.number += operand,
+                        @backingInt(OpCode.OP_SUBTRACT) => self.stack.lastPtr().?.*.number -= operand,
+                        @backingInt(OpCode.OP_MULTIPLY) => self.stack.lastPtr().?.*.number *= operand,
+                        @backingInt(OpCode.OP_DIVIDE) => self.stack.lastPtr().?.*.number /= operand,
                         else => unreachable,
-                    };
+                    }
                 },
                 @backingInt(OpCode.OP_RETURN) => {
                     try printValue(writer, self.stack.pop() orelse .nil);
-                    writer.print("\n", .{}) catch return error.WRITER_ERROR;
+                    writer.print("\n", .{}) catch return InterpretError.WRITER_ERROR;
                     break;
                 },
-                else => return error.RUNTIME_ERROR,
+                else => return InterpretError.RUNTIME_ERROR,
             }
 
             if (writer.unusedCapacityLen() < 1024) {}
         }
         if (comptime opt.trace_execution) {
-            debug.printTableFoot(writer) catch return error.WRITER_ERROR;
+            debug.printTableFoot(writer) catch return InterpretError.WRITER_ERROR;
         }
         if (comptime opt.run_duration) {
             const runDuration = starttime.untilNow(self.io, .cpu_thread);
             const runTimeMilliseconds = @as(f64, @floatFromInt(runDuration.toMicroseconds())) / 1000.0;
-            writer.print("Runtime: {d:.3}ms\n", .{runTimeMilliseconds}) catch return error.WRITER_ERROR;
+            writer.print("Runtime: {d:.3}ms\n", .{runTimeMilliseconds}) catch return InterpretError.WRITER_ERROR;
         }
-        writer.flush() catch return error.WRITER_ERROR;
+        writer.flush() catch return InterpretError.WRITER_ERROR;
     }
 
     /// Demons, noses you know the spiel.
@@ -134,14 +133,6 @@ pub const VirtualMachine = struct {
         return self.stack.pop() orelse return InterpretError.STACK_UNDERFLOW;
     }
 
-    fn popStackNumber(self: *Self) InterpretError!f64 {
-        const number = switch (try self.popStack()) {
-            .number => |value| value,
-            else => return InterpretError.RUNTIME_ERROR,
-        };
-        return number;
-    }
-
     fn pushStack(self: *Self, value: Value) InterpretError!void {
         return self.stack.append(self.allocator, value) catch return InterpretError.STACK_OVERFLOW;
     }
@@ -149,10 +140,10 @@ pub const VirtualMachine = struct {
     fn printValue(writer: *std.Io.Writer, value: Value) InterpretError!void {
         switch (value) {
             .number => |v| {
-                writer.print("{d}", .{v}) catch return error.WRITER_ERROR;
+                writer.print("{d}", .{v}) catch return InterpretError.WRITER_ERROR;
             },
             .nil => {
-                writer.print("nil", .{}) catch return error.WRITER_ERROR;
+                writer.print("nil", .{}) catch return InterpretError.WRITER_ERROR;
             },
         }
     }
