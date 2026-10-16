@@ -65,6 +65,10 @@ pub fn main(init: std.process.Init) !void {
     // for (50..500) |idx| {
     //     try chunk.addConstant(Value{ .number = @floatFromInt(idx) }, line);
     // }
+     for (0..10_000) |_| {
+         try chunk.addConstant(Value{ .number = 1}, line);
+         try chunk.addOpCode(.OP_ADD, line);
+     }
 
     try chunk.addConstant(Value{ .number = -3 }, line);
     try chunk.addOpCode(.OP_NEGATE, line);

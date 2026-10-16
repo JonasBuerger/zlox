@@ -5,8 +5,7 @@ const print = std.debug.print;
 const Chunk = @import("chunk.zig").ManagedChunk;
 const OpCode = @import("chunk.zig").OpCode;
 const Value = @import("chunk.zig").Value;
-const trace_execution = @import("build_options").trace_execution;
-const stack_trace = @import("build_options").stack_trace;
+const opt = @import("build_options");
 const debug = @import("debug.zig");
 
 pub const InterpretError = error{
@@ -55,21 +54,21 @@ pub const VirtualMachine = struct {
         const writer = &file_writer.interface;
         const starttime = std.Io.Clock.now(.cpu_thread, self.io);
 
-        if (comptime trace_execution) {
+        if (comptime opt.trace_execution) {
             debug.printTableHead(writer) catch return error.WRITER_ERROR;
         }
 
         while (true) {
-            if (comptime trace_execution) {
-                if (comptime stack_trace) {
-                    writer.print("│", .{}) catch return error.WRITER_ERROR;
-                    for (self.stack.items) |stackValue| {
-                        try printValue(writer, stackValue);
+            if (comptime opt.trace_stack) {
+                writer.print("│", .{}) catch return error.WRITER_ERROR;
+                for (self.stack.items) |stackValue| {
+                    try printValue(writer, stackValue);
 
-                        writer.print("│", .{}) catch return error.WRITER_ERROR;
-                    }
-                    writer.print("\n", .{}) catch return error.WRITER_ERROR;
+                    writer.print("│", .{}) catch return error.WRITER_ERROR;
                 }
+                writer.print("\n", .{}) catch return error.WRITER_ERROR;
+            }
+            if (comptime opt.trace_execution) {
                 _ = debug.disassembleInstruction(self.chunk.?, self.ip.? - self.chunk.?.code.items.ptr, writer) catch return error.WRITER_ERROR;
             }
             switch (self.readByte()) {
@@ -101,10 +100,13 @@ pub const VirtualMachine = struct {
 
             if (writer.unusedCapacityLen() < 1024) {}
         }
-        if (comptime trace_execution) {
+        if (comptime opt.trace_execution) {
             debug.printTableFoot(writer) catch return error.WRITER_ERROR;
-            const runtime = @as(f64, @floatFromInt(starttime.untilNow(self.io, .cpu_thread).toMicroseconds())) / 1000.0;
-            writer.print("Runtime: {d:.3}ms\n", .{runtime}) catch return error.WRITER_ERROR;
+        }
+        if (comptime opt.run_duration) {
+            const runDuration = starttime.untilNow(self.io, .cpu_thread);
+            const runTimeMilliseconds = @as(f64, @floatFromInt(runDuration.toMicroseconds())) / 1000.0;
+            writer.print("Runtime: {d:.3}ms\n", .{runTimeMilliseconds}) catch return error.WRITER_ERROR;
         }
         writer.flush() catch return error.WRITER_ERROR;
     }
