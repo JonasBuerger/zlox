@@ -1,15 +1,19 @@
 const std = @import("std");
 const disassembleChunk = @import("debug.zig").disassembleChunk;
-const Chunk = @import("chunk.zig").ManagedChunk;
-const OpCode = @import("chunk.zig").OpCode;
-const Value = @import("chunk.zig").Value;
-const VirtualMachine = @import("vm.zig").VirtualMachine;
+const ExitCode = @import("exit_code.zig").ExitCode;
+const ByteCode = @import("bytecode.zig");
+const OpCode = ByteCode.OpCode;
+const Value = ByteCode.Value;
+const VirtualMachine = @import("vm.zig");
 
 comptime {
-    _ = @import("chunk.zig");
-    _ = @import("debug.zig");
-    _ = @import("box_chars.zig");
-    _ = @import("vm.zig");
+    if (@import("builtin").is_test) {
+        _ = @import("box_chars.zig");
+        _ = @import("bytecode.zig");
+        _ = @import("debug.zig");
+        _ = @import("scanner.zig");
+        _ = @import("vm.zig");
+    }
 }
 
 pub fn main(init: std.process.Init) !u8 {
@@ -36,10 +40,10 @@ pub fn main(init: std.process.Init) !u8 {
         // Print usage information
         try writer.print("Usage: {s} [path]\n", .{args[0]});
         try writer.flush();
-        return 64;
+        return @intFromEnum(ExitCode.EX_USAGE);
     }
 
-    return 0;
+    return @intFromEnum(ExitCode.SUCCESS);
 }
 
 fn repl(vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
@@ -74,8 +78,8 @@ fn interpret(source: []u8, vm: *VirtualMachine, _: std.Io, allocator: std.mem.Al
     var chunk = try compile(source, allocator);
     try vm.interpret(&chunk);
 }
-fn compile(_: []u8, allocator: std.mem.Allocator) !Chunk {
-    var chunk = Chunk.init(allocator);
-    try chunk.addConstant(.nil, 1);
+fn compile(_: []u8, allocator: std.mem.Allocator) !ByteCode {
+    var chunk = ByteCode.init(allocator);
+    try chunk.addOpCode(OpCode.OP_RETURN, 1);
     return chunk;
 }
