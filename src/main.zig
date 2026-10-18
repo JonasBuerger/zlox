@@ -5,6 +5,7 @@ const ByteCode = @import("bytecode.zig");
 const OpCode = ByteCode.OpCode;
 const Value = ByteCode.Value;
 const VirtualMachine = @import("vm.zig");
+const Scanner = @import("scanner.zig");
 
 comptime {
     if (@import("builtin").is_test) {
@@ -56,29 +57,47 @@ fn repl(vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
     while (true) {
         try writer.print("> ", .{});
         try writer.flush();
-        const input = try std.Io.Reader.takeDelimiter(reader, '\n') orelse return;
+        var input = try std.Io.Reader.takeDelimiter(reader, '\n') orelse return;
         if (input.len == 0) return;
-        try interpret(input, vm, io, allocator);
+        try interpret(&input, vm, io, allocator);
     }
 }
 
 fn runFile(path: []u8, vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
     // Read the file contents all at once
-    const source = try std.Io.Dir.readFileAlloc(
+    var source = try std.Io.Dir.readFileAlloc(
         std.Io.Dir.cwd(),
         io,
         path,
         allocator,
         .unlimited,
     );
-    try interpret(source, vm, io, allocator);
+    try interpret(&source, vm, io, allocator);
 }
 
-fn interpret(source: []u8, vm: *VirtualMachine, _: std.Io, allocator: std.mem.Allocator) !void {
+fn interpret(source: *[]u8, vm: *VirtualMachine, _: std.Io, allocator: std.mem.Allocator) !void {
     var chunk = try compile(source, allocator);
     try vm.interpret(&chunk);
 }
-fn compile(_: []u8, allocator: std.mem.Allocator) !ByteCode {
+fn compile(source: *[]u8, allocator: std.mem.Allocator) !ByteCode {
+    var scanner: Scanner = .init(source);
+    var currentLine: usize = 0;
+    while (true) {
+        const token = scanner.getToken();
+        if (token.line != currentLine) {
+            std.debug.print("{d: >4}│", .{token.line});
+            currentLine = token.line;
+        } else {
+            std.debug.print("    │", .{});
+        }
+
+        std.debug.print("{s: >20}│'{s}'\n", .{ @tagName(token.type), token.lexeme });
+
+        if (token.type == Scanner.TokenType.EOF) {
+            break;
+        }
+    }
+
     var chunk = ByteCode.init(allocator);
     try chunk.addOpCode(OpCode.OP_RETURN, 1);
     return chunk;
