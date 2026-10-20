@@ -6,11 +6,13 @@ const OpCode = ByteCode.OpCode;
 const Value = ByteCode.Value;
 const VirtualMachine = @import("vm.zig");
 const Scanner = @import("scanner.zig");
+const Compiler = @import("compiler.zig");
 
 comptime {
     if (@import("builtin").is_test) {
         _ = @import("box_chars.zig");
         _ = @import("bytecode.zig");
+        _ = @import("compiler.zig");
         _ = @import("debug.zig");
         _ = @import("scanner.zig");
         _ = @import("vm.zig");
@@ -41,10 +43,10 @@ pub fn main(init: std.process.Init) !u8 {
         // Print usage information
         try writer.print("Usage: {s} [path]\n", .{args[0]});
         try writer.flush();
-        return @intFromEnum(ExitCode.EX_USAGE);
+        return @backingInt(ExitCode.EX_USAGE);
     }
 
-    return @intFromEnum(ExitCode.SUCCESS);
+    return @backingInt(ExitCode.SUCCESS);
 }
 
 fn repl(vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
@@ -58,6 +60,7 @@ fn repl(vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
         try writer.print("> ", .{});
         try writer.flush();
         var input = try std.Io.Reader.takeDelimiter(reader, '\n') orelse return;
+        defer allocator.free(input);
         if (input.len == 0) return;
         try interpret(&input, vm, io, allocator);
     }
@@ -72,33 +75,14 @@ fn runFile(path: []u8, vm: *VirtualMachine, io: std.Io, allocator: std.mem.Alloc
         allocator,
         .unlimited,
     );
+    defer allocator.free(source);
     try interpret(&source, vm, io, allocator);
 }
 
 fn interpret(source: *[]u8, vm: *VirtualMachine, _: std.Io, allocator: std.mem.Allocator) !void {
-    var chunk = try compile(source, allocator);
-    try vm.interpret(&chunk);
-}
-fn compile(source: *[]u8, allocator: std.mem.Allocator) !ByteCode {
-    var scanner: Scanner = .init(source);
-    var currentLine: usize = 0;
-    while (true) {
-        const token = scanner.getToken();
-        if (token.line != currentLine) {
-            std.debug.print("{d: >4}│", .{token.line});
-            currentLine = token.line;
-        } else {
-            std.debug.print("    │", .{});
-        }
-
-        std.debug.print("{s: >20}│'{s}'\n", .{ @tagName(token.type), token.lexeme });
-
-        if (token.type == Scanner.TokenType.EOF) {
-            break;
-        }
-    }
-
     var chunk = ByteCode.init(allocator);
-    try chunk.addOpCode(OpCode.OP_RETURN, 1);
-    return chunk;
+    defer chunk.deinit();
+    var compiler: Compiler = .{ .chunk = &chunk, .scanner = .init{source} };
+    try compiler.compile();
+    try vm.interpret(&chunk);
 }

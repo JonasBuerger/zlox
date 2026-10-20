@@ -9,7 +9,6 @@ const opt = @import("build_options");
 const debug = @import("debug.zig");
 
 const VirtualMachine = @This();
-
 chunk: ?*ByteCode,
 ip: ?[*]u8,
 stack: std.ArrayList(Value),

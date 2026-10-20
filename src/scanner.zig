@@ -1,15 +1,22 @@
-const Scanner = @This();
 const std = @import("std");
 
+const Scanner = @This();
 source: *[]u8,
 start: usize,
 current: usize,
 line: usize,
 
-const Token = struct {
+pub const Token = struct {
     type: TokenType,
     lexeme: []u8,
     line: usize,
+
+    const Self = @This();
+    pub const empty: Self = .{
+        .type = TokenType.ERROR,
+        .lexeme = "",
+        .line = 0,
+    };
 };
 
 pub const TokenType = enum {

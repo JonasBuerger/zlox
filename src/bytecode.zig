@@ -1,7 +1,12 @@
-const ByteCode = @This();
 const std = @import("std");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
+
+const ByteCode = @This();
+code: ArrayList(u8),
+constants: ArrayList(Value),
+lines: ArrayList(usize),
+allocator: Allocator,
 
 pub const OpCode = enum(u8) {
     OP_CONSTANT_LONG,
@@ -23,11 +28,6 @@ pub const Value = union(ValueType) {
     number: f64,
     nil: void,
 };
-
-code: ArrayList(u8),
-constants: ArrayList(Value),
-lines: ArrayList(usize),
-allocator: Allocator,
 
 pub fn init(allocator: Allocator) ByteCode {
     return .{
