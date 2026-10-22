@@ -134,6 +134,7 @@ fn match(self: *Scanner, expected: u8) bool {
     return true;
 }
 fn peek(self: *Scanner) u8 {
+    if (self.isAtEnd()) return '\x00';
     return self.source.*[self.current];
 }
 fn peekNext(self: *Scanner) u8 {

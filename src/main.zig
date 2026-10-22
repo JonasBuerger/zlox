@@ -82,7 +82,9 @@ fn runFile(path: []u8, vm: *VirtualMachine, io: std.Io, allocator: std.mem.Alloc
 fn interpret(source: *[]u8, vm: *VirtualMachine, _: std.Io, allocator: std.mem.Allocator) !void {
     var chunk = ByteCode.init(allocator);
     defer chunk.deinit();
-    var compiler: Compiler = .{ .chunk = &chunk, .scanner = .init{source} };
-    try compiler.compile();
-    try vm.interpret(&chunk);
+    var scanner = Scanner.init(source);
+    var compiler: Compiler = .{ .compilingChunk = &chunk, .scanner = &scanner };
+    if (try compiler.compile()) {
+        try vm.interpret(&chunk);
+    }
 }
