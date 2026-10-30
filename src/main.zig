@@ -2,11 +2,13 @@ const std = @import("std");
 const disassembleChunk = @import("debug.zig").disassembleChunk;
 const ExitCode = @import("exit_code.zig").ExitCode;
 const ByteCode = @import("bytecode.zig");
+const ErrorContext = @import("error_context.zig");
 const OpCode = ByteCode.OpCode;
 const Value = ByteCode.Value;
 const VirtualMachine = @import("vm.zig");
 const Scanner = @import("scanner.zig");
 const Compiler = @import("compiler.zig");
+const opt = @import("build_options");
 
 comptime {
     if (@import("builtin").is_test) {
@@ -14,6 +16,8 @@ comptime {
         _ = @import("bytecode.zig");
         _ = @import("compiler.zig");
         _ = @import("debug.zig");
+        _ = @import("error_context.zig");
+        _ = @import("exit_code.zig");
         _ = @import("scanner.zig");
         _ = @import("vm.zig");
     }
@@ -79,12 +83,22 @@ fn runFile(path: []u8, vm: *VirtualMachine, io: std.Io, allocator: std.mem.Alloc
     try interpret(&source, vm, io, allocator);
 }
 
-fn interpret(source: *[]u8, vm: *VirtualMachine, _: std.Io, allocator: std.mem.Allocator) !void {
+fn interpret(source: *[]u8, vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
     var chunk = ByteCode.init(allocator);
     defer chunk.deinit();
+    var errors = ErrorContext.init(allocator);
+    defer errors.deinit();
     var scanner = Scanner.init(source);
-    var compiler: Compiler = .{ .compilingChunk = &chunk, .scanner = &scanner };
-    if (try compiler.compile()) {
+    var compiler: Compiler = .{ .compilingChunk = &chunk, .scanner = &scanner, .errors = &errors };
+    try compiler.compile();
+    if (errors.hasErrors()) {
+        var writer_buffer: [1024]u8 = undefined;
+        var stderr_writer: std.Io.File.Writer = .init(.stderr(), io, &writer_buffer);
+        try errors.printAll(&stderr_writer.interface);
+    } else {
+        if (comptime opt.print_code) {
+            try disassembleChunk(chunk, "compiler output", io);
+        }
         try vm.interpret(&chunk);
     }
 }

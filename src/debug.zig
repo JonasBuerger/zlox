@@ -22,9 +22,6 @@ pub fn disassembleChunk(chunk: ByteCode, name: []const u8, io: std.Io) !void {
 
     while (offset < chunk.code.items.len) {
         offset = try disassembleInstruction(chunk, offset, writer);
-        if (writer.unusedCapacityLen() < 255) {
-            try writer.flush();
-        }
     }
     try writer.print(TableFooter, .{});
     try writer.flush();
@@ -40,7 +37,13 @@ fn disassembleInstruction(chunk: ByteCode, offset: usize, writer: *std.Io.Writer
 
     const instruction = chunk.code.items[offset];
     return switch (instruction) {
-        @backingInt(OpCode.OP_RETURN) => {
+        @backingInt(OpCode.OP_RETURN),
+        @backingInt(OpCode.OP_ADD),
+        @backingInt(OpCode.OP_SUBTRACT),
+        @backingInt(OpCode.OP_MULTIPLY),
+        @backingInt(OpCode.OP_DIVIDE),
+        @backingInt(OpCode.OP_NEGATE),
+        => {
             try printOpCode(@fromBackingInt(instruction), writer);
             try printEmptyOperandField(writer);
             try printEmptyOperandField(writer);
@@ -103,6 +106,8 @@ fn printValue(value: Value, writer: *std.Io.Writer) !void {
                 try writer.print("{e: <28}│", .{v});
             }
         },
+        .bool => |v| try writer.print("{s}│", .{if (v) "true" else "false"}),
+        .nil => try writer.writeAll("nil"),
     }
 }
 

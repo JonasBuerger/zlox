@@ -20,7 +20,7 @@ pub const InterpretError = error{
     STACK_OVERFLOW,
     STACK_UNDERFLOW,
     RUNTIME_ERROR,
-    WRITER_ERROR,
+    WriteFailed,
 };
 
 pub fn init(io: std.Io, allocator: Allocator) VirtualMachine {
@@ -53,21 +53,21 @@ fn run(self: *VirtualMachine) InterpretError!void {
     const starttime = std.Io.Clock.now(.cpu_thread, self.io);
 
     if (comptime opt.trace_execution) {
-        debug.printTableHead(writer) catch return InterpretError.WRITER_ERROR;
+        try debug.printTableHead(writer);
     }
 
     while (true) {
         if (comptime opt.trace_stack) {
-            writer.print("│", .{}) catch return InterpretError.WRITER_ERROR;
+            try writer.print("│", .{});
             for (self.stack.items) |stackValue| {
                 try printValue(writer, stackValue);
 
-                writer.print("│", .{}) catch return InterpretError.WRITER_ERROR;
+                try writer.print("│", .{});
             }
-            writer.print("\n", .{}) catch return InterpretError.WRITER_ERROR;
+            try writer.print("\n", .{});
         }
         if (comptime opt.trace_execution) {
-            _ = debug.disassembleInstruction(self.chunk.?, self.ip.? - self.chunk.?.code.items.ptr, writer) catch return InterpretError.WRITER_ERROR;
+            _ = try debug.disassembleInstruction(self.chunk.?, self.ip.? - self.chunk.?.code.items.ptr, writer);
         }
         switch (self.readByte()) {
             @backingInt(OpCode.OP_CONSTANT) => try self.pushStack(self.readConstant()),
@@ -89,23 +89,21 @@ fn run(self: *VirtualMachine) InterpretError!void {
             },
             @backingInt(OpCode.OP_RETURN) => {
                 try printValue(writer, self.stack.pop() orelse .nil);
-                writer.print("\n", .{}) catch return InterpretError.WRITER_ERROR;
+                try writer.print("\n", .{});
                 break;
             },
             else => return InterpretError.RUNTIME_ERROR,
         }
-
-        if (writer.unusedCapacityLen() < 1024) {}
     }
     if (comptime opt.trace_execution) {
-        debug.printTableFoot(writer) catch return InterpretError.WRITER_ERROR;
+        try debug.printTableFoot(writer);
     }
     if (comptime opt.run_duration) {
         const runDuration = starttime.untilNow(self.io, .cpu_thread);
         const runTimeMilliseconds = @as(f64, @floatFromInt(runDuration.toMicroseconds())) / 1000.0;
-        writer.print("Runtime: {d:.3}ms\n", .{runTimeMilliseconds}) catch return InterpretError.WRITER_ERROR;
+        try writer.print("Runtime: {d:.3}ms\n", .{runTimeMilliseconds});
     }
-    writer.flush() catch return InterpretError.WRITER_ERROR;
+    try writer.flush();
 }
 
 /// Demons, noses you know the spiel.
@@ -138,10 +136,13 @@ fn pushStack(self: *VirtualMachine, value: Value) InterpretError!void {
 fn printValue(writer: *std.Io.Writer, value: Value) InterpretError!void {
     switch (value) {
         .number => |v| {
-            writer.print("{d}", .{v}) catch return InterpretError.WRITER_ERROR;
+            try writer.print("{d}", .{v});
+        },
+        .bool => |v| {
+            try writer.print("{s}", .{if (v) "true" else "false"});
         },
         .nil => {
-            writer.print("nil", .{}) catch return InterpretError.WRITER_ERROR;
+            try writer.print("nil", .{});
         },
     }
 }

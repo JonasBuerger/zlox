@@ -16,6 +16,7 @@ pub fn build(b: *std.Build) void {
     const options = b.addOptions();
     options.addOption(bool, "trace_execution", b.option(bool, "trace_execution", "print executed bytecode instructions") orelse false);
     options.addOption(bool, "trace_stack", b.option(bool, "trace_stack", "print stack before every bytecode instructions") orelse false);
+    options.addOption(bool, "print_code", b.option(bool, "print_code", "print bytecode chunk after compilation") orelse false);
     options.addOption(bool, "run_duration", b.option(bool, "run_duration", "print the duration spent executing bytecode") orelse false);
     exe.root_module.addOptions("build_options", options);
 

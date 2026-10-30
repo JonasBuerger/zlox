@@ -7,16 +7,17 @@ const VirtualMachine = @import("vm.zig");
 const Scanner = @import("scanner.zig");
 const Token = Scanner.Token;
 const TokenType = Scanner.TokenType;
+const ErrorContext = @import("error_context.zig");
 
 const Compiler = @This();
 previous: Token = .empty,
 current: Token = .empty,
-hadError: bool = false,
 panicMode: bool = false,
 compilingChunk: *ByteCode,
 scanner: *Scanner,
+errors: *ErrorContext,
 
-pub const CompilerError = error{ COMPILER_ERROR, OutOfMemory, InvalidCharacter };
+pub const CompilerError = error{ OutOfMemory, InvalidCharacter };
 
 const Precedence = enum(u8) {
     NONE,
@@ -81,13 +82,12 @@ const rules: std.EnumArray(TokenType, ParseRule) = .init(.{
     .EOF = .{ .prefix = null, .infix = null, .precedence = .NONE },
 });
 
-pub fn compile(self: *Compiler) !bool {
+pub fn compile(self: *Compiler) !void {
     try self.advance();
     try self.expression();
     try self.consume(TokenType.EOF, "Expect end of expression.");
 
     try self.end();
-    return !self.hadError;
 }
 
 fn advance(self: *Compiler) !void {
@@ -96,7 +96,7 @@ fn advance(self: *Compiler) !void {
         self.current = self.scanner.getToken();
         if (self.current.type != TokenType.ERROR) break;
 
-        self.errorAt(&self.current, self.current.lexeme);
+        try self.errorAt(&self.current, self.current.lexeme);
     }
 }
 
@@ -106,7 +106,7 @@ fn consume(self: *Compiler, tokenType: TokenType, message: []const u8) !void {
         return;
     }
 
-    self.errorAt(&self.current, message);
+    try self.errorAt(&self.current, message);
 }
 
 fn currentChunk(self: *Compiler) *ByteCode {
@@ -125,17 +125,16 @@ fn end(self: *Compiler) !void {
     try self.emitOpCode(OpCode.OP_RETURN);
 }
 
-fn errorAt(self: *Compiler, token: *Token, message: []const u8) void {
+fn errorAt(self: *Compiler, token: *Token, message: []const u8) !void {
     if (self.panicMode) return;
     self.panicMode = true;
-    std.debug.print("[line {d}] Error", .{token.line});
+    try self.errors.append("[line {d}] Error", .{token.line});
     if (token.type == TokenType.EOF) {
-        std.debug.print(" at end", .{});
+        try self.errors.append(" at end", .{});
     } else if (token.type != TokenType.ERROR) {
-        std.debug.print(" at '{s}'", .{token.lexeme});
+        try self.errors.append(" at '{s}'", .{token.lexeme});
     }
-    std.debug.print(": {s}\n", .{message});
-    self.hadError = true;
+    try self.errors.append(": {s}\n", .{message});
 }
 fn expression(self: *Compiler) !void {
     try self.parsePrecedence(.ASSIGNEMENT);
@@ -180,7 +179,7 @@ fn parsePrecedence(self: *Compiler, precedence: Precedence) !void {
     if (prefixRule) |rule| {
         try rule(self);
     } else {
-        self.errorAt(&self.previous, "Expect expression.");
+        try self.errorAt(&self.previous, "Expect expression.");
         return;
     }
 

@@ -21,11 +21,13 @@ pub const OpCode = enum(u8) {
 
 pub const ValueType = enum {
     number,
+    bool,
     nil,
 };
 
 pub const Value = union(ValueType) {
     number: f64,
+    bool: bool,
     nil: void,
 };
 
