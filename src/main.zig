@@ -99,6 +99,6 @@ fn interpret(source: *[]u8, vm: *VirtualMachine, io: std.Io, allocator: std.mem.
         if (comptime opt.print_code) {
             try disassembleChunk(chunk, "compiler output", io);
         }
-        try vm.interpret(&chunk);
+        vm.interpret(&chunk) catch {};
     }
 }

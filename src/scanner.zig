@@ -214,8 +214,8 @@ fn identifierType(self: *Scanner) TokenType {
         't' => {
             if (self.current - self.start > 1) {
                 return switch (self.source.*[self.start + 1]) {
-                    'h' => self.checkKeyword(2, "is", TokenType.FALSE),
-                    'r' => self.checkKeyword(2, "ue", TokenType.FOR),
+                    'h' => self.checkKeyword(2, "is", TokenType.THIS),
+                    'r' => self.checkKeyword(2, "ue", TokenType.TRUE),
                     else => TokenType.IDENTIFIER,
                 };
             }

@@ -11,10 +11,17 @@ allocator: Allocator,
 pub const OpCode = enum(u8) {
     OP_CONSTANT_LONG,
     OP_CONSTANT,
+    OP_NIL,
+    OP_TRUE,
+    OP_FALSE,
+    OP_EQUAL,
+    OP_GREATER,
+    OP_LESS,
     OP_ADD,
     OP_SUBTRACT,
     OP_MULTIPLY,
     OP_DIVIDE,
+    OP_NOT,
     OP_NEGATE,
     OP_RETURN,
 };
@@ -29,6 +36,10 @@ pub const Value = union(ValueType) {
     number: f64,
     bool: bool,
     nil: void,
+
+    pub fn is(self: Value, comptime valueType: ValueType) bool {
+        return @backingInt(self) == @backingInt(valueType);
+    }
 };
 
 pub fn init(allocator: Allocator) ByteCode {

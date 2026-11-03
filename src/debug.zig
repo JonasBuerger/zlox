@@ -42,7 +42,14 @@ fn disassembleInstruction(chunk: ByteCode, offset: usize, writer: *std.Io.Writer
         @backingInt(OpCode.OP_SUBTRACT),
         @backingInt(OpCode.OP_MULTIPLY),
         @backingInt(OpCode.OP_DIVIDE),
+        @backingInt(OpCode.OP_NOT),
         @backingInt(OpCode.OP_NEGATE),
+        @backingInt(OpCode.OP_NIL),
+        @backingInt(OpCode.OP_TRUE),
+        @backingInt(OpCode.OP_FALSE),
+        @backingInt(OpCode.OP_EQUAL),
+        @backingInt(OpCode.OP_LESS),
+        @backingInt(OpCode.OP_GREATER),
         => {
             try printOpCode(@fromBackingInt(instruction), writer);
             try printEmptyOperandField(writer);
@@ -106,8 +113,8 @@ fn printValue(value: Value, writer: *std.Io.Writer) !void {
                 try writer.print("{e: <28}│", .{v});
             }
         },
-        .bool => |v| try writer.print("{s}│", .{if (v) "true" else "false"}),
-        .nil => try writer.writeAll("nil"),
+        .bool => |v| try writer.print("{s: <28}│", .{if (v) "true" else "false"}),
+        .nil => try writer.writeAll("nil                         |"),
     }
 }
 

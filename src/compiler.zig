@@ -51,31 +51,31 @@ const rules: std.EnumArray(TokenType, ParseRule) = .init(.{
     .SEMICOLON = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .STAR = .{ .prefix = null, .infix = binary, .precedence = .FACTOR },
     .SLASH = .{ .prefix = null, .infix = binary, .precedence = .FACTOR },
-    .BANG = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .BANG_EQUAL = .{ .prefix = null, .infix = null, .precedence = .NONE },
+    .BANG = .{ .prefix = unary, .infix = null, .precedence = .NONE },
+    .BANG_EQUAL = .{ .prefix = null, .infix = binary, .precedence = .EQUALITY },
     .EQUAL = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .EQUAL_EQUAL = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .GREATER = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .GREATER_EQUAL = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .LESS = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .LESS_EQUAL = .{ .prefix = null, .infix = null, .precedence = .NONE },
+    .EQUAL_EQUAL = .{ .prefix = null, .infix = binary, .precedence = .EQUALITY },
+    .GREATER = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON },
+    .GREATER_EQUAL = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON },
+    .LESS = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON },
+    .LESS_EQUAL = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON },
     .IDENTIFIER = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .STRING = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .NUMBER = .{ .prefix = number, .infix = null, .precedence = .NONE },
     .AND = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .CLASS = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .ELSE = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .FALSE = .{ .prefix = null, .infix = null, .precedence = .NONE },
+    .FALSE = .{ .prefix = literal, .infix = null, .precedence = .NONE },
     .FOR = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .FUN = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .IF = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .NIL = .{ .prefix = null, .infix = null, .precedence = .NONE },
+    .NIL = .{ .prefix = literal, .infix = null, .precedence = .NONE },
     .OR = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .PRINT = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .RETURN = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .SUPER = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .THIS = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .TRUE = .{ .prefix = null, .infix = null, .precedence = .NONE },
+    .TRUE = .{ .prefix = literal, .infix = null, .precedence = .NONE },
     .VAR = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .WHILE = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .ERROR = .{ .prefix = null, .infix = null, .precedence = .NONE },
@@ -143,6 +143,14 @@ fn number(self: *Compiler) CompilerError!void {
     const value = try std.fmt.parseFloat(f64, self.previous.lexeme);
     try self.emitConstant(.{ .number = value });
 }
+fn literal(self: *Compiler) CompilerError!void {
+    switch (self.previous.type) {
+        .TRUE => try self.emitOpCode(.OP_TRUE),
+        .FALSE => try self.emitOpCode(.OP_FALSE),
+        .NIL => try self.emitOpCode(.OP_NIL),
+        else => unreachable,
+    }
+}
 fn grouping(self: *Compiler) CompilerError!void {
     try self.expression();
     try self.consume(TokenType.RIGHT_PAREN, "Expect ')' after expression.");
@@ -153,6 +161,7 @@ fn unary(self: *Compiler) CompilerError!void {
     try self.parsePrecedence(.UNARY);
 
     switch (operatorType) {
+        TokenType.BANG => try self.emitOpCode(.OP_NOT),
         TokenType.MINUS => try self.emitOpCode(.OP_NEGATE),
         else => unreachable,
     }
@@ -165,6 +174,21 @@ fn binary(self: *Compiler) CompilerError!void {
     try self.parsePrecedence(@fromBackingInt(@backingInt(rule.precedence) + 1));
 
     switch (operatorType) {
+        TokenType.BANG_EQUAL => {
+            try self.emitOpCode(.OP_EQUAL);
+            try self.emitOpCode(.OP_NOT);
+        },
+        TokenType.EQUAL_EQUAL => try self.emitOpCode(.OP_EQUAL),
+        TokenType.GREATER => try self.emitOpCode(.OP_GREATER),
+        TokenType.GREATER_EQUAL => {
+            try self.emitOpCode(.OP_LESS);
+            try self.emitOpCode(.OP_NOT);
+        },
+        TokenType.LESS => try self.emitOpCode(.OP_LESS),
+        TokenType.LESS_EQUAL => {
+            try self.emitOpCode(.OP_GREATER);
+            try self.emitOpCode(.OP_NOT);
+        },
         TokenType.PLUS => try self.emitOpCode(.OP_ADD),
         TokenType.MINUS => try self.emitOpCode(.OP_SUBTRACT),
         TokenType.STAR => try self.emitOpCode(.OP_MULTIPLY),
