@@ -1,10 +1,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
-const print = std.debug.print;
 const ByteCode = @import("bytecode.zig");
 const OpCode = ByteCode.OpCode;
 const Value = ByteCode.Value;
+const Object = ByteCode.Object;
 const opt = @import("build_options");
 const debug = @import("debug.zig");
 
@@ -14,6 +14,7 @@ ip: ?[*]u8,
 stack: std.ArrayList(Value),
 allocator: Allocator,
 io: std.Io,
+objects: ?*Object = null,
 
 pub const InterpretError = error{
     COMPILE_ERROR,
@@ -21,6 +22,7 @@ pub const InterpretError = error{
     STACK_UNDERFLOW,
     RUNTIME_ERROR,
     WriteFailed,
+    OutOfMemory,
 };
 
 pub fn init(io: std.Io, allocator: Allocator) VirtualMachine {
@@ -35,6 +37,11 @@ pub fn init(io: std.Io, allocator: Allocator) VirtualMachine {
 
 pub fn deinit(self: *VirtualMachine) void {
     self.stack.deinit(self.allocator);
+    while (self.objects) |object| {
+        const next = object.next;
+        object.deinit(self.allocator);
+        self.objects = next;
+    }
 }
 
 pub fn interpret(self: *VirtualMachine, chunk: *ByteCode) InterpretError!void {
@@ -74,7 +81,7 @@ fn run(self: *VirtualMachine) InterpretError!void {
         if (comptime opt.trace_execution) {
             _ = try debug.disassembleInstruction(self.chunk.?, self.ip.? - self.chunk.?.code.items.ptr, stderr);
         }
-        switch (self.readByte()) {
+        code: switch (self.readByte()) {
             @backingInt(OpCode.OP_CONSTANT) => try self.pushStack(self.readConstant()),
             @backingInt(OpCode.OP_CONSTANT_LONG) => try self.pushStack(self.readConstantLong()),
             @backingInt(OpCode.OP_NIL) => try self.pushStack(.nil),
@@ -94,6 +101,10 @@ fn run(self: *VirtualMachine) InterpretError!void {
             @backingInt(OpCode.OP_LESS),
             @backingInt(OpCode.OP_GREATER),
             => |opCode| {
+                if ((self.peek(0).isObjectAnd(.string) and self.peek(1).isObjectAnd(.string))) {
+                    try self.concatenate();
+                    break :code;
+                }
                 if (!(self.peek(0).is(.number) and self.peek(1).is(.number))) {
                     try self.runtimeError(stderr, "Operands must be numbers.", .{});
                 }
@@ -162,6 +173,22 @@ fn isFalsey(value: Value) bool {
     return value.is(.nil) or (value.is(.bool) and !value.bool);
 }
 
+fn concatenate(self: *VirtualMachine) !void {
+    const right = try self.popStack();
+    const left = try self.popStack();
+    const concatenated = try std.mem.concat(self.allocator, u8, &[_][]const u8{ left.object.*.value.string, right.object.*.value.string });
+    const value = try self.allocateObject();
+    value.*.value.string = concatenated;
+    try self.pushStack(.{ .object = value });
+}
+
+fn allocateObject(self: *VirtualMachine) !*Object {
+    const value = try self.allocator.create(Object);
+    value.next = self.objects;
+    self.objects = value;
+    return value;
+}
+
 fn valuesEqual(left: Value, right: Value) bool {
     if (@backingInt(left) != @backingInt(right)) {
         return false;
@@ -170,6 +197,14 @@ fn valuesEqual(left: Value, right: Value) bool {
         .bool => left.bool == right.bool,
         .nil => true,
         .number => left.number == right.number,
+        .object => {
+            if (@backingInt(left.object.*.value) != @backingInt(right.object.*.value)) {
+                return false;
+            }
+            return switch (left.object.*.value) {
+                .string => std.mem.eql(u8, left.object.*.value.string, right.object.*.value.string),
+            };
+        },
     };
 }
 
@@ -191,6 +226,9 @@ fn printValue(writer: *std.Io.Writer, value: Value) InterpretError!void {
         },
         .bool => |v| {
             try writer.print("{s}", .{if (v) "true" else "false"});
+        },
+        .object => |object| switch (object.*.value) {
+            .string => |v| try writer.print("{s}", .{v}),
         },
         .nil => {
             try writer.print("nil", .{});

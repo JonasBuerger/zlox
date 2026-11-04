@@ -13,6 +13,7 @@ const Compiler = @This();
 previous: Token = .empty,
 current: Token = .empty,
 panicMode: bool = false,
+allocator: std.mem.Allocator,
 compilingChunk: *ByteCode,
 scanner: *Scanner,
 errors: *ErrorContext,
@@ -60,7 +61,7 @@ const rules: std.EnumArray(TokenType, ParseRule) = .init(.{
     .LESS = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON },
     .LESS_EQUAL = .{ .prefix = null, .infix = binary, .precedence = .COMPARISON },
     .IDENTIFIER = .{ .prefix = null, .infix = null, .precedence = .NONE },
-    .STRING = .{ .prefix = null, .infix = null, .precedence = .NONE },
+    .STRING = .{ .prefix = string, .infix = null, .precedence = .NONE },
     .NUMBER = .{ .prefix = number, .infix = null, .precedence = .NONE },
     .AND = .{ .prefix = null, .infix = null, .precedence = .NONE },
     .CLASS = .{ .prefix = null, .infix = null, .precedence = .NONE },
@@ -142,6 +143,12 @@ fn expression(self: *Compiler) !void {
 fn number(self: *Compiler) CompilerError!void {
     const value = try std.fmt.parseFloat(f64, self.previous.lexeme);
     try self.emitConstant(.{ .number = value });
+}
+fn string(self: *Compiler) CompilerError!void {
+    const copied = try self.allocator.dupe(u8, self.previous.lexeme[1 .. self.previous.lexeme.len - 1]);
+    const value = try self.allocator.create(ByteCode.Object);
+    value.*.value.string = copied;
+    try self.emitConstant(.{ .object = value });
 }
 fn literal(self: *Compiler) CompilerError!void {
     switch (self.previous.type) {

@@ -24,20 +24,25 @@ comptime {
 }
 
 pub fn main(init: std.process.Init) !u8 {
-    const arena: std.mem.Allocator = init.arena.allocator();
+    //const allocator: std.mem.Allocator = init.arena.allocator();
+
+    var debug_allocator = std.heap.DebugAllocator(.{}).init;
+    const allocator: std.mem.Allocator = debug_allocator.allocator();
+    defer _ = debug_allocator.deinit();
 
     // read in all args
-    const args = try init.minimal.args.toSlice(arena);
+    const args = try init.minimal.args.toSlice(allocator);
+    defer allocator.free(args);
 
-    var vm: VirtualMachine = .init(init.io, arena);
+    var vm: VirtualMachine = .init(init.io, allocator);
     defer vm.deinit();
 
     // Ensure a single arg with a filepath
     if (args.len == 1) {
-        try repl(&vm, init.io, arena);
+        try repl(&vm, init.io, allocator);
     } else if (args.len == 2) {
-        const path = try std.Io.Dir.realPathFileAlloc(std.Io.Dir.cwd(), init.io, args[1], arena);
-        try runFile(path, &vm, init.io, arena);
+        const path = try std.Io.Dir.realPathFileAlloc(std.Io.Dir.cwd(), init.io, args[1], allocator);
+        try runFile(path, &vm, init.io, allocator);
     } else {
         // initialize a stdout writer
         var stdout_buffer: [1024]u8 = undefined;
@@ -55,16 +60,16 @@ pub fn main(init: std.process.Init) !u8 {
 
 fn repl(vm: *VirtualMachine, io: std.Io, allocator: std.mem.Allocator) !void {
     var read_buffer: [4_096]u8 = undefined;
-    var write_buffer: [4_096]u8 = undefined;
+    var write_buffer: [8]u8 = undefined;
     var stdin_reader = std.Io.File.stdin().reader(io, &read_buffer);
     var stdout_writer: std.Io.File.Writer = .init(.stdout(), io, &write_buffer);
     const reader = &stdin_reader.interface;
     const writer = &stdout_writer.interface;
     while (true) {
-        try writer.print("> ", .{});
+        try writer.writeAll("> ");
         try writer.flush();
         var input = try std.Io.Reader.takeDelimiter(reader, '\n') orelse return;
-        defer allocator.free(input);
+        //defer allocator.free(input);
         if (input.len == 0) return;
         try interpret(&input, vm, io, allocator);
     }
@@ -89,7 +94,7 @@ fn interpret(source: *[]u8, vm: *VirtualMachine, io: std.Io, allocator: std.mem.
     var errors = ErrorContext.init(allocator);
     defer errors.deinit();
     var scanner = Scanner.init(source);
-    var compiler: Compiler = .{ .compilingChunk = &chunk, .scanner = &scanner, .errors = &errors };
+    var compiler: Compiler = .{ .compilingChunk = &chunk, .scanner = &scanner, .errors = &errors, .allocator = allocator };
     try compiler.compile();
     if (errors.hasErrors()) {
         var writer_buffer: [1024]u8 = undefined;

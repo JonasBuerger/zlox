@@ -1,5 +1,4 @@
 const std = @import("std");
-const print = std.debug.print;
 const ByteCode = @import("bytecode.zig");
 const OpCode = ByteCode.OpCode;
 const Value = ByteCode.Value;
@@ -114,7 +113,16 @@ fn printValue(value: Value, writer: *std.Io.Writer) !void {
             }
         },
         .bool => |v| try writer.print("{s: <28}│", .{if (v) "true" else "false"}),
-        .nil => try writer.writeAll("nil                         |"),
+        .nil => try writer.writeAll("nil                         │"),
+        .object => |object| switch (object.*) {
+            .string => |v| {
+                try writer.print("\"{s}\"", .{v});
+                if (v.len < 26) {
+                    for (0..(26 - v.len)) |_| try writer.writeAll(" ");
+                }
+                try writer.writeAll("│");
+            },
+        },
     }
 }
 
