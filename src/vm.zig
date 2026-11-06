@@ -177,35 +177,19 @@ fn concatenate(self: *VirtualMachine) !void {
     const right = try self.popStack();
     const left = try self.popStack();
     const concatenated = try std.mem.concat(self.allocator, u8, &[_][]const u8{ left.object.*.value.string, right.object.*.value.string });
-    const value = try self.allocateObject();
-    value.*.value.string = concatenated;
+    const value = try self.allocateString(concatenated);
     try self.pushStack(.{ .object = value });
 }
 
-fn allocateObject(self: *VirtualMachine) !*Object {
-    const value = try self.allocator.create(Object);
+fn allocateString(self: *VirtualMachine, string: []const u8) !*Object {
+    const value: *Object = try .initString(self.allocator, string);
     value.next = self.objects;
     self.objects = value;
     return value;
 }
 
 fn valuesEqual(left: Value, right: Value) bool {
-    if (@backingInt(left) != @backingInt(right)) {
-        return false;
-    }
-    return switch (left) {
-        .bool => left.bool == right.bool,
-        .nil => true,
-        .number => left.number == right.number,
-        .object => {
-            if (@backingInt(left.object.*.value) != @backingInt(right.object.*.value)) {
-                return false;
-            }
-            return switch (left.object.*.value) {
-                .string => std.mem.eql(u8, left.object.*.value.string, right.object.*.value.string),
-            };
-        },
-    };
+    return left.equals(right);
 }
 
 fn runtimeError(self: *VirtualMachine, writer: *std.Io.Writer, comptime fmt: []const u8, args: anytype) InterpretError!void {

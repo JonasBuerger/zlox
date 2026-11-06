@@ -145,10 +145,10 @@ fn number(self: *Compiler) CompilerError!void {
     try self.emitConstant(.{ .number = value });
 }
 fn string(self: *Compiler) CompilerError!void {
-    const copied = try self.allocator.dupe(u8, self.previous.lexeme[1 .. self.previous.lexeme.len - 1]);
-    const value = try self.allocator.create(ByteCode.Object);
-    value.*.value.string = copied;
-    try self.emitConstant(.{ .object = value });
+    const object = try self.allocator.create(ByteCode.Object);
+    object.value.string = self.previous.lexeme[1 .. self.previous.lexeme.len - 1];
+    object.hash = ByteCode.Object.hashString(self.previous.lexeme[1 .. self.previous.lexeme.len - 1]);
+    try self.emitConstant(.{ .object = object });
 }
 fn literal(self: *Compiler) CompilerError!void {
     switch (self.previous.type) {

@@ -34,12 +34,41 @@ pub const Object = struct {
     value: union(ObjectType) {
         string: []const u8,
     },
-    next: ?*Object = null,
+    hash: u32,
+    next: ?*Object,
+    pub fn initString(allocator: std.mem.Allocator, string: []const u8) !*Object {
+        const object = try allocator.create(Object);
+        object.value.string = string;
+        object.hash = hashString(string);
+        object.next = null;
+        return object;
+    }
     pub fn deinit(self: *Object, allocator: std.mem.Allocator) void {
         switch (self.value) {
             .string => |value| allocator.free(value),
         }
         allocator.destroy(self);
+        self.* = undefined;
+    }
+    // FNV-1a hash https://www.isthe.com/chongo/tech/comp/fnv/
+    pub fn hashString(string: []const u8) u32 {
+        var hash: u32 = 2166136261;
+        for (0..string.len) |index| {
+            hash ^= string[index];
+            hash = @mulWithOverflow(hash, 16777619)[0];
+        }
+        return hash;
+    }
+    pub fn equals(self: Object, other: Object) bool {
+        if (@backingInt(self.value) != @backingInt(other.value)) {
+            return false;
+        }
+        if (self.hash != other.hash) {
+            return false;
+        }
+        return switch (self.value) {
+            .string => std.mem.eql(u8, self.value.string, other.value.string),
+        };
     }
 };
 
@@ -58,6 +87,17 @@ pub const Value = union(ValueType) {
 
     pub fn is(self: Value, comptime valueType: ValueType) bool {
         return self == valueType;
+    }
+    pub fn equals(self: Value, other: Value) bool {
+        if (@backingInt(self) != @backingInt(other)) {
+            return false;
+        }
+        return switch (self) {
+            .bool => self.bool == other.bool,
+            .nil => true,
+            .number => self.number == other.number,
+            .object => self.object.equals(other.object.*),
+        };
     }
     pub fn isObjectAnd(self: Value, comptime objectType: ObjectType) bool {
         return switch (self) {
@@ -83,7 +123,11 @@ pub fn init(allocator: Allocator) ByteCode {
 }
 
 pub fn deinit(self: *ByteCode) void {
-    for (self.constants.items) |value| value.deinit(self.allocator);
+    // Free only the object pointer for constant strings, the string is held by the scanner
+    for (self.constants.items) |value| switch (value) {
+        .object => |object| self.allocator.destroy(object),
+        else => {},
+    };
     self.code.deinit(self.allocator);
     self.constants.deinit(self.allocator);
     self.lines.deinit(self.allocator);
