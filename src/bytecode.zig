@@ -48,7 +48,6 @@ pub const Object = struct {
             .string => |value| allocator.free(value),
         }
         allocator.destroy(self);
-        self.* = undefined;
     }
     // FNV-1a hash https://www.isthe.com/chongo/tech/comp/fnv/
     pub fn hashString(string: []const u8) u32 {
@@ -58,17 +57,6 @@ pub const Object = struct {
             hash = @mulWithOverflow(hash, 16777619)[0];
         }
         return hash;
-    }
-    pub fn equals(self: Object, other: Object) bool {
-        if (@backingInt(self.value) != @backingInt(other.value)) {
-            return false;
-        }
-        if (self.hash != other.hash) {
-            return false;
-        }
-        return switch (self.value) {
-            .string => std.mem.eql(u8, self.value.string, other.value.string),
-        };
     }
 };
 
@@ -96,7 +84,8 @@ pub const Value = union(ValueType) {
             .bool => self.bool == other.bool,
             .nil => true,
             .number => self.number == other.number,
-            .object => self.object.equals(other.object.*),
+            // Only works because all strings get interned eagerly
+            .object => self.object == other.object,
         };
     }
     pub fn isObjectAnd(self: Value, comptime objectType: ObjectType) bool {

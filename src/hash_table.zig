@@ -8,7 +8,7 @@ entries: []Entry,
 
 const MAX_LOAD = 0.75;
 
-const empty = HashTable{
+pub const empty = HashTable{
     .count = 0,
     .entries = &.{},
 };
@@ -18,8 +18,13 @@ const Entry = struct {
     value: Value,
 };
 
+pub fn deinit(self: *HashTable, allocator: std.mem.Allocator) void {
+    allocator.free(self.entries);
+    self.* = .empty;
+}
+
 pub fn set(self: *HashTable, allocator: std.mem.Allocator, key: *Object, value: Value) !void {
-    if (self.count + 1 > @as(f64, @floatFromInt(self.entries.len)) * MAX_LOAD) {
+    if (@as(f64, @floatFromInt(self.count + 1)) > @as(f64, @floatFromInt(self.entries.len)) * MAX_LOAD) {
         try self.growCapacity(allocator);
     }
     var entry = findEntry(self.entries, key);
@@ -30,7 +35,7 @@ pub fn set(self: *HashTable, allocator: std.mem.Allocator, key: *Object, value: 
 
 fn growCapacity(self: *HashTable, allocator: std.mem.Allocator) !void {
     const newCapacity = if (self.entries.len < 8) 8 else self.entries.len * 2;
-    const entries = try allocator.alloc(Entry, newCapacity);
+    var entries = try allocator.alloc(Entry, newCapacity);
     for (0..entries.len) |index| {
         entries[index] = .{ .key = null, .value = .nil };
     }
@@ -72,16 +77,33 @@ pub fn remove(self: *HashTable, key: *Object) void {
     entry.value = .{ .bool = true };
 }
 
-fn findEntry(entries: *[]Entry, key: *Object) *Entry {
+fn findEntry(entries: []Entry, key: *Object) *Entry {
     var index = key.hash % entries.len;
     var tombstone: ?*Entry = null;
     while (true) : (index = (index + 1) % entries.len) {
-        const entry = &entries[index];
+        if (entries[index].key) |entryKey| {
+            if (entryKey == key) return &entries[index];
+        } else {
+            if (entries[index].value == .nil) {
+                return if (tombstone) |stone| stone else &entries[index];
+            } else {
+                if (tombstone == null) tombstone = &entries[index];
+            }
+        }
+    }
+}
+
+pub fn findInternedString(self: HashTable, key: []const u8, hash: u32) ?*Object {
+    if (self.count == 0) return null;
+    var index = hash % self.entries.len;
+    var tombstone: ?*Entry = null;
+    while (true) : (index = (index + 1) % self.entries.len) {
+        const entry: *Entry = &self.entries[index];
         if (entry.key) |entryKey| {
-            if (entryKey.equals(key)) return entry;
+            if (entryKey.value.string.len == key.len and entryKey.hash == hash and std.mem.eql(u8, entryKey.value.string, key)) return entryKey;
         } else {
             if (entry.value == .nil) {
-                return if (tombstone) tombstone else entry;
+                return if (tombstone) |stone| stone.key else entry.key;
             } else {
                 if (tombstone == null) tombstone = entry;
             }
@@ -92,11 +114,6 @@ fn findEntry(entries: *[]Entry, key: *Object) *Entry {
 pub fn loadFactor(self: HashTable) f64 {
     if (self.entries.len == 0) return 1;
     return @as(f64, @floatFromInt(self.count)) / @as(f64, @floatFromInt(self.entries.len));
-}
-
-pub fn deinit(self: *HashTable, allocator: std.mem.Allocator) void {
-    allocator.free(self.entries);
-    self.* = undefined;
 }
 
 test "empty hashtable reports as full" {

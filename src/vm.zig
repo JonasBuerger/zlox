@@ -7,6 +7,7 @@ const Value = ByteCode.Value;
 const Object = ByteCode.Object;
 const opt = @import("build_options");
 const debug = @import("debug.zig");
+const HashTable = @import("hash_table.zig");
 
 const VirtualMachine = @This();
 chunk: ?*ByteCode,
@@ -14,6 +15,7 @@ ip: ?[*]u8,
 stack: std.ArrayList(Value),
 allocator: Allocator,
 io: std.Io,
+strings: HashTable,
 objects: ?*Object = null,
 
 pub const InterpretError = error{
@@ -32,11 +34,13 @@ pub fn init(io: std.Io, allocator: Allocator) VirtualMachine {
         .stack = .empty,
         .allocator = allocator,
         .io = io,
+        .strings = .empty,
     };
 }
 
 pub fn deinit(self: *VirtualMachine) void {
     self.stack.deinit(self.allocator);
+    self.strings.deinit(self.allocator);
     while (self.objects) |object| {
         const next = object.next;
         object.deinit(self.allocator);
@@ -82,8 +86,8 @@ fn run(self: *VirtualMachine) InterpretError!void {
             _ = try debug.disassembleInstruction(self.chunk.?, self.ip.? - self.chunk.?.code.items.ptr, stderr);
         }
         code: switch (self.readByte()) {
-            @backingInt(OpCode.OP_CONSTANT) => try self.pushStack(self.readConstant()),
-            @backingInt(OpCode.OP_CONSTANT_LONG) => try self.pushStack(self.readConstantLong()),
+            @backingInt(OpCode.OP_CONSTANT) => try self.pushStack(try self.readConstant()),
+            @backingInt(OpCode.OP_CONSTANT_LONG) => try self.pushStack(try self.readConstantLong()),
             @backingInt(OpCode.OP_NIL) => try self.pushStack(.nil),
             @backingInt(OpCode.OP_TRUE) => try self.pushStack(.{ .bool = true }),
             @backingInt(OpCode.OP_FALSE) => try self.pushStack(.{ .bool = false }),
@@ -147,14 +151,24 @@ fn readByte(self: *VirtualMachine) u8 {
     return instruction;
 }
 
-fn readConstant(self: *VirtualMachine) Value {
+fn readConstant(self: *VirtualMachine) !Value {
     const valueIndex = self.readByte();
-    return self.chunk.?.constants.items[valueIndex];
+    var value = self.chunk.?.constants.items[valueIndex];
+    if (value == .object) value.object = try self.adoptConstantObject(value.object);
+    return value;
 }
 
-fn readConstantLong(self: *VirtualMachine) Value {
+fn readConstantLong(self: *VirtualMachine) !Value {
     const valueIndex = @as(u24, self.readByte()) | (@as(u24, self.readByte()) << 8) | (@as(u24, self.readByte()) << 16);
-    return self.chunk.?.constants.items[valueIndex];
+    var value = self.chunk.?.constants.items[valueIndex];
+    if (value == .object) value.object = try self.adoptConstantObject(value.object);
+    return value;
+}
+
+fn adoptConstantObject(self: *VirtualMachine, object: *Object) !*Object {
+    return switch (object.value) {
+        .string => |string| self.copyString(string),
+    };
 }
 
 fn popStack(self: *VirtualMachine) InterpretError!Value {
@@ -177,14 +191,29 @@ fn concatenate(self: *VirtualMachine) !void {
     const right = try self.popStack();
     const left = try self.popStack();
     const concatenated = try std.mem.concat(self.allocator, u8, &[_][]const u8{ left.object.*.value.string, right.object.*.value.string });
-    const value = try self.allocateString(concatenated);
+    const value = try self.takeString(concatenated);
     try self.pushStack(.{ .object = value });
 }
 
-fn allocateString(self: *VirtualMachine, string: []const u8) !*Object {
+fn copyString(self: *VirtualMachine, string: []const u8) !*Object {
+    if (self.strings.findInternedString(string, Object.hashString(string))) |interned| return interned;
+    const copied = try self.allocator.alloc(u8, string.len);
+    std.mem.copyForwards(u8, copied, string);
+    return self.makeStringObject(copied);
+}
+fn takeString(self: *VirtualMachine, string: []const u8) !*Object {
+    if (self.strings.findInternedString(string, Object.hashString(string))) |interned| {
+        self.allocator.free(string);
+        return interned;
+    }
+    return self.makeStringObject(string);
+}
+
+fn makeStringObject(self: *VirtualMachine, string: []const u8) !*Object {
     const value: *Object = try .initString(self.allocator, string);
     value.next = self.objects;
     self.objects = value;
+    try self.strings.set(self.allocator, value, .nil);
     return value;
 }
 
