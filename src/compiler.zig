@@ -85,29 +85,45 @@ const rules: std.EnumArray(TokenType, ParseRule) = .init(.{
 
 pub fn compile(self: *Compiler) !void {
     try self.advance();
-    try self.expression();
-    try self.consume(TokenType.EOF, "Expect end of expression.");
+
+    while (!try self.match(TokenType.EOF)) {
+        try self.declaration();
+    }
 
     try self.end();
+}
+
+fn declaration(self: *Compiler) !void {
+    return self.statement();
+}
+
+fn statement(self: *Compiler) !void {
+    if (try self.match(TokenType.PRINT)) {
+        try self.printStatement();
+    }
 }
 
 fn advance(self: *Compiler) !void {
     self.previous = self.current;
     while (true) {
         self.current = self.scanner.getToken();
-        if (self.current.type != TokenType.ERROR) break;
+        if (!self.check(TokenType.ERROR)) break;
 
         try self.errorAt(&self.current, self.current.lexeme);
     }
 }
 
 fn consume(self: *Compiler, tokenType: TokenType, message: []const u8) !void {
-    if (self.current.type == tokenType) {
+    if (self.check(tokenType)) {
         try self.advance();
         return;
     }
 
     try self.errorAt(&self.current, message);
+}
+
+inline fn check(self: *Compiler, tokenType: TokenType) bool {
+    return self.current.type == tokenType;
 }
 
 fn currentChunk(self: *Compiler) *ByteCode {
@@ -139,6 +155,18 @@ fn errorAt(self: *Compiler, token: *Token, message: []const u8) !void {
 }
 fn expression(self: *Compiler) !void {
     try self.parsePrecedence(.ASSIGNEMENT);
+}
+fn printStatement(self: *Compiler) !void {
+    try self.expression();
+    try self.consume(TokenType.SEMICOLON, "Expect ';' after value.");
+    try self.emitOpCode(OpCode.OP_PRINT);
+}
+fn match(self: *Compiler, tokenType: TokenType) !bool {
+    if (!self.check(tokenType)) {
+        return false;
+    }
+    try self.advance();
+    return true;
 }
 fn number(self: *Compiler) CompilerError!void {
     const value = try std.fmt.parseFloat(f64, self.previous.lexeme);

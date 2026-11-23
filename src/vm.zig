@@ -124,9 +124,12 @@ fn run(self: *VirtualMachine) InterpretError!void {
                 }
             },
             @backingInt(OpCode.OP_NOT) => try self.pushStack(.{ .bool = isFalsey(try self.popStack()) }),
-            @backingInt(OpCode.OP_RETURN) => {
+            @backingInt(OpCode.OP_PRINT) => {
                 try printValue(stdout, self.stack.pop() orelse .nil);
                 try stdout.print("\n", .{});
+            },
+            @backingInt(OpCode.OP_RETURN) => {
+                // Exit interpreter
                 break;
             },
             else => unreachable,
