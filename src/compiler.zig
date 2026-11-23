@@ -94,12 +94,15 @@ pub fn compile(self: *Compiler) !void {
 }
 
 fn declaration(self: *Compiler) !void {
-    return self.statement();
+    try self.statement();
+    if (self.panicMode) try self.synchronize();
 }
 
 fn statement(self: *Compiler) !void {
-    if (try self.match(TokenType.PRINT)) {
+    if (try self.match(.PRINT)) {
         try self.printStatement();
+    } else {
+        try self.expressionStatement();
     }
 }
 
@@ -107,7 +110,7 @@ fn advance(self: *Compiler) !void {
     self.previous = self.current;
     while (true) {
         self.current = self.scanner.getToken();
-        if (!self.check(TokenType.ERROR)) break;
+        if (!self.check(.ERROR)) break;
 
         try self.errorAt(&self.current, self.current.lexeme);
     }
@@ -156,11 +159,37 @@ fn errorAt(self: *Compiler, token: *Token, message: []const u8) !void {
 fn expression(self: *Compiler) !void {
     try self.parsePrecedence(.ASSIGNEMENT);
 }
+fn expressionStatement(self: *Compiler) !void {
+    try self.expression();
+    try self.consume(.SEMICOLON, "Expect ';' after value.");
+    try self.emitOpCode(OpCode.OP_POP);
+}
 fn printStatement(self: *Compiler) !void {
     try self.expression();
-    try self.consume(TokenType.SEMICOLON, "Expect ';' after value.");
+    try self.consume(.SEMICOLON, "Expect ';' after value.");
     try self.emitOpCode(OpCode.OP_PRINT);
 }
+
+fn synchronize(self: *Compiler) !void {
+    self.panicMode = false;
+    while (!self.check(.EOF)) {
+        if (self.previous.type == .SEMICOLON) return;
+        switch (self.current.type) {
+            .CLASS,
+            .FUN,
+            .VAR,
+            .FOR,
+            .IF,
+            .WHILE,
+            .PRINT,
+            .RETURN,
+            => return,
+            else => {},
+        }
+        try self.advance();
+    }
+}
+
 fn match(self: *Compiler, tokenType: TokenType) !bool {
     if (!self.check(tokenType)) {
         return false;

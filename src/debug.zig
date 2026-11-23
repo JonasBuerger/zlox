@@ -50,6 +50,7 @@ fn disassembleInstruction(chunk: ByteCode, offset: usize, writer: *std.Io.Writer
         @backingInt(OpCode.OP_LESS),
         @backingInt(OpCode.OP_GREATER),
         @backingInt(OpCode.OP_PRINT),
+        @backingInt(OpCode.OP_POP),
         => {
             try printOpCode(@fromBackingInt(instruction), writer);
             try printEmptyOperandField(writer);

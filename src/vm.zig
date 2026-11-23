@@ -128,6 +128,7 @@ fn run(self: *VirtualMachine) InterpretError!void {
                 try printValue(stdout, self.stack.pop() orelse .nil);
                 try stdout.print("\n", .{});
             },
+            @backingInt(OpCode.OP_POP) => _ = try self.popStack(),
             @backingInt(OpCode.OP_RETURN) => {
                 // Exit interpreter
                 break;
