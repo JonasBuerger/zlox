@@ -49,6 +49,7 @@ fn disassembleInstruction(chunk: ByteCode, offset: usize, writer: *std.Io.Writer
         @backingInt(OpCode.OP_EQUAL),
         @backingInt(OpCode.OP_LESS),
         @backingInt(OpCode.OP_GREATER),
+        @backingInt(OpCode.OP_PRINT),
         => {
             try printOpCode(@fromBackingInt(instruction), writer);
             try printEmptyOperandField(writer);
@@ -114,7 +115,7 @@ fn printValue(value: Value, writer: *std.Io.Writer) !void {
         },
         .bool => |v| try writer.print("{s: <28}│", .{if (v) "true" else "false"}),
         .nil => try writer.writeAll("nil                         │"),
-        .object => |object| switch (object.*) {
+        .object => |object| switch (object.*.value) {
             .string => |v| {
                 try writer.print("\"{s}\"", .{v});
                 if (v.len < 26) {
